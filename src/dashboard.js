@@ -1,9 +1,8 @@
 // src/dashboard.js
-// Статичная HTML-оболочка дашборда. Worker отдаёт её как есть (0 работы при
-// запросе), а страница сама тянет /api/data и рендерит всё в браузере.
-// Почему так: на бесплатном тарифе Workers (10мс CPU, свежий изолят на запрос)
-// сборка большого HTML сервером не укладывается в лимит — а нативный JSON
-// (fetch /api/data) и клиентский рендер работают без проблем.
+// Статичная HTML-оболочка дашборда (DASHBOARD_HTML) + клиентский JS (DASHBOARD_JS).
+// Worker отдаёт их как есть (0 работы при запросе), браузер сам тянет /api/data
+// и рисует всё. Клиентский JS вынесен в отдельный ответ /dash.js: суммарно HTML+JS
+// больше лимита ответа бесплатного тарифа (~19.5KB), по отдельности — меньше.
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
@@ -104,7 +103,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   <div id="warn" class="warn" style="display:none"></div>
   <div class="cards" id="cards"><div class="spinner"></div><div class="loading-txt">Загружаем портфели…</div></div>
 </div>
-<script>
+<script src="/dash.js"></script>
+</body></html>`;
+
+export const DASHBOARD_JS = `
 var COLORS = ["#7aa2ff","#3ddc84","#ffb454","#ff7a9c","#9b7aff","#5bd3c7","#e05f9e","#8bd450","#ff8a5c","#5c8aff","#d4d450","#b55cd4","#50d4b4","#ff5c5c","#4fd4e0"];
 var TYPE_NAMES = { wallet:"кошелёк", deposit:"депозит", loan:"займ", borrowed:"займ", staked:"стейк", locked:"лок", vesting:"вестинг", reward:"награда" };
 var CHAIN_NAMES = { ethereum:"Ethereum", arbitrum:"Arbitrum", optimism:"Optimism", base:"Base", polygon:"Polygon", bsc:"BNB Chain", "binance-smart-chain":"BNB Chain", monad:"Monad", avalanche:"Avalanche", solana:"Solana", fantom:"Fantom", linea:"Linea", zksync:"zkSync", mantle:"Mantle", gnosis:"Gnosis", celo:"Celo", xdai:"Gnosis", "avalanche-c":"Avalanche" };
@@ -413,5 +415,4 @@ Promise.all([
   document.getElementById("cards").innerHTML = '<div class="loading">Ошибка загрузки: ' + esc(e.message) + "</div>";
 });
 setInterval(function(){ if (LAST_UPDATED) setUpdated(LAST_UPDATED); }, 30000);
-</script>
-</body></html>`;
+`;

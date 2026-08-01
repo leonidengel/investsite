@@ -1,6 +1,6 @@
 import { WALLETS, STABLECOIN_SYMBOLS } from "./config.js";
 import { refreshRF, getRF } from "./rf.js";
-import { DASHBOARD_HTML } from "./dashboard.js";
+import { DASHBOARD_HTML, DASHBOARD_JS } from "./dashboard.js";
 
 const KV_KEY = "snapshot";
 // Ключи KV для страницы «Горячие пулы» (готовые строки, рендерит скрипт sync-pools)
@@ -266,6 +266,12 @@ export default {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
         return new Response(raw, { headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+      if (url.pathname === "/dash.js") {
+        // Клиентский JS дашборда отдельным файлом (оболочка+JS вместе больше лимита ответа)
+        return new Response(DASHBOARD_JS, {
+          headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" },
+        });
       }
       // Дашборд: статичная оболочка, данные тянет сам браузер через /api/data
       return new Response(DASHBOARD_HTML, {
