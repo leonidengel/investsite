@@ -19,11 +19,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .wrap { max-width:1280px; margin:0 auto; }
   h1 { font-size:22px; margin:0 0 4px; }
   .sub { color:#66718a; font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
-  @media (max-width:900px) {
-    .cards { grid-template-columns:repeat(2, 1fr); }
-    .card.comb { grid-column:1 / -1; }
-  }
+  .cards { display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }
   @media (max-width:640px) {
     body { padding:12px; padding-top:max(12px, env(safe-area-inset-top)); padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
     .cards { grid-template-columns:1fr; }
@@ -40,7 +36,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .stat.debt b { color:#dc2626; }
   .card { background:#fff; border:1px solid #e4e8f0; border-radius:14px; padding:18px;
           box-shadow:0 1px 2px rgba(16,24,40,.04); }
-  .card.comb { grid-column:1 / 3; } /* верхний блок на 2/3 — два нижних ровно под ним */
+  .card.comb { grid-column:1 / -1; } /* прямоугольный блок сверху на всю ширину, под ним 2 колонки портфелей */
   .head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .ok { color:#0e9f6e; font-size:12px; font-weight:600; }
   .err { color:#dc2626; font-size:12px; font-weight:600; }
@@ -139,6 +135,22 @@ function fmtMoney(v) {
 }
 
 function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+// «обновлено X мин назад» (относительное время)
+function timeAgo(iso) {
+  var ms = Date.now() - new Date(iso).getTime();
+  var min = Math.floor(ms / 60000);
+  if (min < 1) return "только что";
+  if (min < 60) return min + " мин назад";
+  var h = Math.floor(min / 60);
+  if (h < 24) return h + " ч " + (min % 60) + " мин назад";
+  return Math.floor(h / 24) + " дн назад";
+}
+var LAST_UPDATED = null;
+function setUpdated(iso) {
+  LAST_UPDATED = iso;
+  var el = document.getElementById("upd");
+  if (el) el.textContent = timeAgo(iso);
+}
 function fmtUSD(v) {
   if (v == null || isNaN(v)) return "—";
   return "$" + v.toLocaleString("en-US", { maximumFractionDigits: v >= 1000 ? 0 : 2 });
@@ -307,7 +319,7 @@ function lendingCard(l, health) {
 function walletCard(w, wi) {
   if (!w.ok) {
     return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="err">ERR</span>' +
-      '<span class="time">' + new Date(w.checkedAt).toLocaleString("ru-RU") + "</span></div>" +
+      '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
       '<div class="url">' + esc(w.address) + "</div>" +
       '<div class="err-msg">' + esc(w.error) + "</div>" + srcLinks(w) + "</div>";
   }
@@ -328,7 +340,7 @@ function walletCard(w, wi) {
       '<div class="aval">' + fmtUSD(a.value) + '</div><div class="apct">' + pct.toFixed(1) + "%</div></div>";
   }).join("");
   return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="ok">' + (pf.total ? "OK" : "0 USD") + "</span>" +
-    '<span class="time">' + new Date(w.checkedAt).toLocaleString("ru-RU") + "</span></div>" +
+    '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
     '<div class="url">' + esc(w.address) + " · " + shortAddr(w.address) + "</div>" +
     '<div class="total-row"><span class="total">' + fmtUSD(pf.total) + "</span> " + chgHtml(change) + "</div>" +
     defiRow(w.categories) +
@@ -342,7 +354,7 @@ function srcLinks(w) {
 }
 function render(snap) {
   document.getElementById("sub").textContent = location.hostname;
-  document.getElementById("upd").textContent = new Date(snap.updatedAt).toLocaleString("ru-RU");
+  setUpdated(snap.updatedAt);
   var warn = document.getElementById("warn");
   if (snap.error) {
     warn.style.display = "block";
@@ -351,7 +363,7 @@ function render(snap) {
   var c = combined(snap), html = "";
   if (c.total) {
     html += '<div class="card comb"><div class="head"><b>Все кошельки</b> <span class="ok">OK</span>' +
-      '<span class="time">' + new Date(snap.updatedAt).toLocaleString("ru-RU") + "</span></div>" +
+      '<span class="time">' + timeAgo(snap.updatedAt) + "</span></div>" +
       '<div class="total-row"><span class="total big">' + fmtUSD(c.total) + "</span> " + chgHtml(c.change) + "</div>" +
       defiRow(c.cats) +
       '<div class="chart-wrap">' + donut(c.top, 230, 30) + '<div class="legend">' + legend(c.top) + "</div></div></div>";
@@ -396,5 +408,6 @@ Promise.all([
 }).catch(function(e){
   document.getElementById("cards").innerHTML = '<div class="loading">Ошибка загрузки: ' + esc(e.message) + "</div>";
 });
+setInterval(function(){ if (LAST_UPDATED) setUpdated(LAST_UPDATED); }, 30000);
 </script>
 </body></html>`;

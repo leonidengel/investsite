@@ -206,7 +206,22 @@ const PERIODS = [7, 30, 60, 90, 120, 180];
 const PERIOD_LABELS = ["24ч", ...PERIODS.map((d) => d + "д")];
 let tab = "blueChip";
 let period = "24h";
-document.getElementById("upd").textContent = new Date(DATA.updatedAt).toLocaleString("ru-RU");
+// «обновлено X мин назад» + автообновление
+function timeAgo(iso) {
+  var ms = Date.now() - new Date(iso).getTime();
+  var min = Math.floor(ms / 60000);
+  if (min < 1) return "только что";
+  if (min < 60) return min + " мин назад";
+  var h = Math.floor(min / 60);
+  if (h < 24) return h + " ч " + (min % 60) + " мин назад";
+  return Math.floor(h / 24) + " дн назад";
+}
+function setUpdated(iso) {
+  var el = document.getElementById("upd");
+  if (el) el.textContent = timeAgo(iso);
+}
+setUpdated(DATA.updatedAt);
+setInterval(function(){ setUpdated(DATA.updatedAt); }, 30000);
 
 const periodsEl = document.getElementById("periods");
 PERIOD_LABELS.forEach((lbl, i) => {
