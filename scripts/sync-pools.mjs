@@ -41,24 +41,25 @@ const RATE_PROJECTS = new Set([
 ]);
 function buildRates(dump) {
   const byChain = {};
-  const consider = (chain, key, apy, tvl) => {
+  const consider = (chain, key, apy, tvl, fee) => {
     if (!chain || !key) return;
     const m = byChain[chain] || (byChain[chain] = {});
     const prev = m[key];
     if (!prev || (tvl || 0) > (prev.t || 0)) {
-      m[key] = { a: apy != null ? +Number(apy).toFixed(2) : null, t: Math.round(tvl || 0) };
+      m[key] = { a: apy != null ? +Number(apy).toFixed(2) : null, t: Math.round(tvl || 0), f: fee || "" };
     }
   };
   for (const p of dump) {
     if (!RATE_PROJECTS.has(p.project)) continue;
     const apy = p.apyBase ?? p.apy ?? null;
     const tvl = p.tvlUsd || 0;
+    const fee = p.poolMeta || ""; // комиссия пула («0.3%»)
     const sym = normSym(p.symbol);
-    consider(p.chain, `${p.project}|${sym}`, apy, tvl);
+    consider(p.chain, `${p.project}|${sym}`, apy, tvl, fee);
     const toks = String(p.symbol || "").split("-").filter(Boolean).map(normSym);
     if (toks.length === 2) {
-      consider(p.chain, `${p.project}|PAIR:${toks[0]}-${toks[1]}`, apy, tvl);
-      consider(p.chain, `${p.project}|PAIR:${toks[1]}-${toks[0]}`, apy, tvl);
+      consider(p.chain, `${p.project}|PAIR:${toks[0]}-${toks[1]}`, apy, tvl, fee);
+      consider(p.chain, `${p.project}|PAIR:${toks[1]}-${toks[0]}`, apy, tvl, fee);
     }
   }
   return byChain;

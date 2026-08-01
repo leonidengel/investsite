@@ -2,9 +2,9 @@
 // Позже допилим: контент, секции, формы.
 
 const HTML = `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Invest Portfolio — Лендинг</title>
+<title>Invest Portfolio — Landing</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -25,15 +25,15 @@ const HTML = `<!doctype html>
   }
 </style></head><body>
 <section class="hero">
-  <h1>Мой инвест-портфель</h1>
-  <p>Лендинг проекта — скоро здесь будет вся ключевая информация, цифры и преимущества.</p>
-  <a class="cta" href="https://portfolio.leonidengel.workers.dev">Смотреть дашборд</a>
+  <h1>My Investment Portfolio</h1>
+  <p>Landing page — all the key info, numbers and benefits coming soon.</p>
+  <a class="cta" href="https://portfolio.leonidengel.workers.dev">View dashboard</a>
 </section>
 <div class="ph-grid">
-  <div class="ph"><b>Ключевые цифры</b>заглушка · будет позже</div>
-  <div class="ph"><b>О проекте</b>заглушка · будет позже</div>
-  <div class="ph"><b>Стратегия</b>заглушка · будет позже</div>
-  <div class="ph"><b>Контакты</b>заглушка · будет позже</div>
+  <div class="ph"><b>Key numbers</b>placeholder · coming soon</div>
+  <div class="ph"><b>About</b>placeholder · coming soon</div>
+  <div class="ph"><b>Strategy</b>placeholder · coming soon</div>
+  <div class="ph"><b>Contacts</b>placeholder · coming soon</div>
 </div>
 </body></html>`;
 

@@ -132,9 +132,9 @@ export function renderPoolsPage(data, subdomain) {
   const payload = JSON.stringify({ updatedAt: data.updatedAt, blueChip: prep(data.blueChip), stableCoin: prep(data.stableCoin) }).replace(/</g, "\\u003c");
 
   return `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Invest Portfolio — Горячие пулы</title>
+<title>Invest Portfolio — Hot Pools</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -180,8 +180,8 @@ export function renderPoolsPage(data, subdomain) {
   }
 </style></head><body>
 <div class="wrap">
-  <h1>🔥 Горячие пулы</h1>
-  <div class="sub"><a class="back" href="/">← Дашборд</a> · обновлено <span id="upd"></span> · данные DefiLlama Yields</div>
+  <h1>🔥 Hot Pools</h1>
+  <div class="sub"><a class="back" href="/">← Dashboard</a> · updated <span id="upd"></span> · data: DefiLlama Yields</div>
   <div class="toolbar">
     <div class="tabs">
       <button class="tab active" data-tab="blueChip">Best Blue-chip Pools</button>
@@ -192,29 +192,29 @@ export function renderPoolsPage(data, subdomain) {
   <div class="table-wrap"><div class="table-scroll">
     <table>
       <thead><tr>
-        <th>#</th><th>Пул</th><th>Сеть</th><th>Протокол</th>
-        <th class="num">TVL</th><th class="num" id="apyHead">APY</th><th class="num">24ч объём</th>
+        <th>#</th><th>Pool</th><th>Network</th><th>Protocol</th>
+        <th class="num">TVL</th><th class="num" id="apyHead">APY</th><th class="num">24h Vol</th>
       </tr></thead>
       <tbody id="rows"><tr><td colspan="7"><div class="spinner"></div></td></tr></tbody>
     </table>
   </div></div>
-  <div class="note">Пары из основных токенов (watchlist), без мусорных пулов (TVL ≥ $0.5M, не outlier). APY за окно — среднее значение APY пула из истории DefiLlama за выбранный период; «—» если истории недостаточно.</div>
+  <div class="note">Pairs of major tokens (watchlist), junk pools filtered out (TVL ≥ $0.5M, not outlier). Window APY is the pool's average APY from DefiLlama history; "—" when not enough history.</div>
 </div>
 <script>
 const DATA = ${payload};
 const PERIODS = [7, 30, 60, 90, 120, 180];
-const PERIOD_LABELS = ["24ч", ...PERIODS.map((d) => d + "д")];
+const PERIOD_LABELS = ["24h", ...PERIODS.map((d) => d + "d")];
 let tab = "blueChip";
 let period = "24h";
-// «обновлено X мин назад» + автообновление
+// relative "updated X min ago" + auto-refresh
 function timeAgo(iso) {
   var ms = Date.now() - new Date(iso).getTime();
   var min = Math.floor(ms / 60000);
-  if (min < 1) return "только что";
-  if (min < 60) return min + " мин назад";
+  if (min < 1) return "just now";
+  if (min < 60) return min + " min ago";
   var h = Math.floor(min / 60);
-  if (h < 24) return h + " ч " + (min % 60) + " мин назад";
-  return Math.floor(h / 24) + " дн назад";
+  if (h < 24) return h + " h " + (min % 60) + " min ago";
+  return Math.floor(h / 24) + " days ago";
 }
 function setUpdated(iso) {
   var el = document.getElementById("upd");
@@ -272,13 +272,13 @@ function render() {
       if (b.v == null) return -1;
       return b.v - a.v;
     });
-  document.getElementById("apyHead").textContent = "APY · " + (period === "24h" ? "24ч" : period + "д");
+  document.getElementById("apyHead").textContent = "APY · " + (period === "24h" ? "24h" : period + "d");
   document.getElementById("rows").innerHTML = sorted
     .map(({ p, v }, i) => {
       const cur = p.apy != null ? p.apy.toFixed(1) + "%" : "—";
       const apyCell = v == null
-        ? '<span class="muted">—</span><div class="sub-lbl">тек. ' + cur + '</div>'
-        : '<span class="apy-val">' + v.toFixed(1) + '%</span><div class="sub-lbl">тек. ' + cur + '</div>';
+        ? '<span class="muted">—</span><div class="sub-lbl">cur. ' + cur + '</div>'
+        : '<span class="apy-val">' + v.toFixed(1) + '%</span><div class="sub-lbl">cur. ' + cur + '</div>';
       const vol = p.vol != null ? fmtMoney(p.vol) : '<span class="muted">—</span>';
       return '<tr><td class="rank">' + (i + 1) + "</td>" +
         '<td><div class="pool"><img src="' + p.ic + '" alt="" loading="lazy" onerror="this.remove()">' +

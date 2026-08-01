@@ -177,9 +177,9 @@ async function ensureRF(env) {
 // в KV (poolsHtml). Здесь только заглушка, пока данные не синхронизированы.
 function poolsFallback() {
   return `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Invest Portfolio — Горячие пулы</title>
+<title>Invest Portfolio — Hot Pools</title>
 <style>
   body { font-family: ui-sans-serif, system-ui, sans-serif; background:#f4f6fa; color:#1b2433;
          margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -190,10 +190,10 @@ function poolsFallback() {
   a { color:#3b6ef5; }
 </style></head><body>
 <div class="box">
-  <h1>🔥 Горячие пулы</h1>
-  <p>Данные ещё не синхронизированы. Запусти <code>node scripts/sync-pools.mjs</code>
-     (или дождись GitHub Actions), и страница наполнится.</p>
-  <p><a href="/">← На дашборд</a></p>
+  <h1>🔥 Hot Pools</h1>
+  <p>Data not synced yet. Run <code>node scripts/sync-pools.mjs</code>
+     (or wait for GitHub Actions) and the page will fill in.</p>
+  <p><a href="/">← Back to dashboard</a></p>
 </div>
 </body></html>`;
 }
