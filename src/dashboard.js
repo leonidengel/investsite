@@ -55,7 +55,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .legend { flex:1; min-width:170px; }
   .li { display:flex; align-items:center; gap:8px; font-size:12px; padding:3px 0; }
   .dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
-  .lname { color:#5a6478; flex:1; }
+  .lname { color:#5a6478; margin-right:4px; }
   .lpct { color:#1b2433; font-weight:600; }
   .lval { color:#8b93a7; }
   h3.sec { font-size:12px; color:#66718a; margin:14px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
@@ -89,6 +89,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .aval { width:74px; text-align:right; color:#1b2433; font-weight:600; }
   .apct { width:48px; text-align:right; color:#8b93a7; }
   .srcs { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .srcs.top { margin:2px 0 8px; justify-content:flex-end; }
   .src, .refresh { font-size:12px; color:#3b6ef5; text-decoration:none; border:1px solid #dbe3f7;
                    padding:6px 12px; border-radius:8px; background:#fff; cursor:pointer; font-family:inherit; }
   .src:hover, .refresh:hover { background:#f4f7ff; }
@@ -97,7 +98,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 </style></head><body>
 <div class="wrap">
   <h1>📊 Инвест-портфель</h1>
-  <div class="sub"><span id="sub"></span> · обновлено <span id="upd">…</span> · крон раз в 15 мин ·
+  <div class="sub"><span id="sub"></span> · обновлено <span id="upd">…</span> ·
     <button id="refresh" class="refresh">⟳ обновить сейчас</button>
     <a class="refresh" href="/pools">🔥 Горячие пулы</a></div>
   <div id="warn" class="warn" style="display:none"></div>
@@ -320,8 +321,9 @@ function walletCard(w, wi) {
   if (!w.ok) {
     return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="err">ERR</span>' +
       '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
+      srcLinks(w, "top") +
       '<div class="url">' + esc(w.address) + "</div>" +
-      '<div class="err-msg">' + esc(w.error) + "</div>" + srcLinks(w) + "</div>";
+      '<div class="err-msg">' + esc(w.error) + "</div></div>";
   }
   var pf = w.portfolio, change = pf.changes && pf.changes.percent_1d;
   var grouped = groupPositions(w.positions);
@@ -341,16 +343,18 @@ function walletCard(w, wi) {
   }).join("");
   return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="ok">' + (pf.total ? "OK" : "0 USD") + "</span>" +
     '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
+    srcLinks(w, "top") +
     '<div class="url">' + esc(w.address) + " · " + shortAddr(w.address) + "</div>" +
     '<div class="total-row"><span class="total">' + fmtUSD(pf.total) + "</span> " + chgHtml(change) + "</div>" +
     defiRow(w.categories) +
-    '<h3 class="sec">Активы</h3>' + (lpCards + lendCards + rows || '<div class="err-msg">нет активов</div>') + srcLinks(w) + "</div>";
+    '<h3 class="sec">Активы</h3>' + (lpCards + lendCards + rows || '<div class="err-msg">нет активов</div>') + "</div>";
 }
-function srcLinks(w) {
+function srcLinks(w, cls) {
   var links = (w.sources || []).map(function(s){
     return '<a class="src" href="' + esc(s.url) + '" target="_blank" rel="noopener">↗ ' + esc(s.name) + "</a>";
   }).join("");
-  return links ? '<div class="srcs">' + links + "</div>" : "";
+  if (!links) return "";
+  return '<div class="srcs' + (cls ? " " + cls : "") + '">' + links + "</div>";
 }
 function render(snap) {
   document.getElementById("sub").textContent = location.hostname;
