@@ -35,7 +35,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .stat.debt b { color:#dc2626; }
   .card { background:#fff; border:1px solid #e4e8f0; border-radius:14px; padding:18px;
           box-shadow:0 1px 2px rgba(16,24,40,.04); }
-  .card.comb { grid-column:1 / -1; } /* прямоугольный блок сверху на всю ширину, под ним 2 колонки портфелей */
+  .card.comb { grid-column:1 / -1; } /* top full-width summary block, wallets in 2 columns below */
   .head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .ok { color:#0e9f6e; font-size:12px; font-weight:600; }
   .err { color:#dc2626; font-size:12px; font-weight:600; }
