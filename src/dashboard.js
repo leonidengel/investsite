@@ -19,10 +19,15 @@ export const DASHBOARD_HTML = `<!doctype html>
   .wrap { max-width:1280px; margin:0 auto; }
   h1 { font-size:22px; margin:0 0 4px; }
   .sub { color:#66718a; font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:16px; }
+  .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
+  @media (max-width:900px) {
+    .cards { grid-template-columns:repeat(2, 1fr); }
+    .card.comb { grid-column:1 / -1; }
+  }
   @media (max-width:640px) {
     body { padding:12px; padding-top:max(12px, env(safe-area-inset-top)); padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
     .cards { grid-template-columns:1fr; }
+    .card.comb { grid-column:1; }
     h1 { font-size:19px; }
     .src, .refresh { padding:10px 14px; }
   }
@@ -35,7 +40,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .stat.debt b { color:#dc2626; }
   .card { background:#fff; border:1px solid #e4e8f0; border-radius:14px; padding:18px;
           box-shadow:0 1px 2px rgba(16,24,40,.04); }
-  .card.comb { grid-column:1 / -1; margin-bottom:4px; }
+  .card.comb { grid-column:1 / 3; } /* верхний блок на 2/3 — два нижних ровно под ним */
   .head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .ok { color:#0e9f6e; font-size:12px; font-weight:600; }
   .err { color:#dc2626; font-size:12px; font-weight:600; }
