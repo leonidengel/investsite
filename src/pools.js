@@ -30,15 +30,16 @@ function toks(p) {
 }
 
 // ---------- Классификация по watchlist ----------
-// blue-chip: все токены из watchlist, есть хотя бы один blue-chip, не чистый стейбл
-// stable: все токены — стейблкоины из watchlist
+// Только LP-пары: ровно 2 монеты (одиночные стейкинг/лендинг-пулы отсекаем).
+// blue-chip: оба токена из watchlist, есть хотя бы один blue-chip, не чистый стейбл
+// stable: оба токена — стейблкоины из watchlist
 export function classifyPools(data) {
   const blue = [];
   const stable = [];
   for (const p of data) {
     if (p.outlier === true || (p.tvlUsd || 0) < MIN_TVL || (p.apy || 0) <= 0) continue;
     const t = toks(p);
-    if (!t.length) continue;
+    if (t.length !== 2 || t[0] === t[1]) continue; // LP-пул = 2 разные монеты
     const hasBlue = t.some((x) => BLUE.has(x));
     const allWatch = t.every((x) => BLUE.has(x) || STABLE.has(x));
     const pureStable = t.every((x) => STABLE.has(x));
@@ -49,8 +50,20 @@ export function classifyPools(data) {
   return { blueChip: top(blue), stableCoin: top(stable) };
 }
 
+// fee-APR в стиле Krystal: годовая доходность от комиссий пула
+// (volume за период × комиссия / TVL × 365 / дни). poolMeta вида «0.3%».
+function feeRateOf(meta) {
+  const m = String(meta || "").match(/(\d+(?:\.\d+)?)%/);
+  return m ? parseFloat(m[1]) / 100 : 0.003; // дефолт 0.3%, если не распознан
+}
+function feeApr(vol, tvl, fee, days) {
+  if (!vol || !tvl || !fee) return null;
+  return +(vol * fee / tvl * (365 / days)).toFixed(2);
+}
+
 // Компактное представление пула для страницы/KV
 export function compact(p) {
+  const fee = feeRateOf(p.poolMeta);
   return {
     id: p.pool,
     s: p.symbol,
@@ -59,6 +72,8 @@ export function compact(p) {
     t: Math.round(p.tvlUsd || 0),
     a: +(p.apy || 0).toFixed(2),
     v: p.volumeUsd1d ? Math.round(p.volumeUsd1d) : null,
+    a1: feeApr(p.volumeUsd1d, p.tvlUsd, fee, 1), // 24h fee-APR
+    a7: feeApr(p.volumeUsd7d, p.tvlUsd, fee, 7), // 7d fee-APR
   };
 }
 
@@ -86,7 +101,13 @@ export function windowMeans(points) {
 }
 
 export async function fetchChartMeans(poolId) {
-  const res = await fetch(`https://yields.llama.fi/chart/${poolId}`);
+  // Ретраи на рейт-лимит: чарты тянутся пачкой, DefiLlama может отдавать 429/5xx
+  let res;
+  for (let i = 0; i < 3; i++) {
+    res = await fetch(`https://yields.llama.fi/chart/${poolId}`);
+    if (res.ok) break;
+    await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+  }
   if (!res.ok) return null;
   const j = await res.json();
   if (j.status !== "success" || !Array.isArray(j.data)) return null;
@@ -127,6 +148,8 @@ export function renderPoolsPage(data, subdomain) {
       tvl: p.t,
       apy: p.a,
       vol: p.v,
+      a1: p.a1,
+      a7: p.a7,
       m: p.m,
     }));
   const payload = JSON.stringify({ updatedAt: data.updatedAt, blueChip: prep(data.blueChip), stableCoin: prep(data.stableCoin) }).replace(/</g, "\\u003c");
