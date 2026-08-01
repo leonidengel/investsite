@@ -170,6 +170,9 @@ export function renderPoolsPage(data, subdomain) {
   .muted { color:#8b93a7; }
   .apy-val { font-weight:700; }
   .note { color:#8b93a7; font-size:11px; margin-top:12px; }
+  .spinner { width:28px; height:28px; border:3px solid #dbe3f7; border-top-color:#3b6ef5; border-radius:50%;
+             animation:spin .8s linear infinite; margin:24px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
   @media (max-width:640px) {
     body { padding:12px; }
     h1 { font-size:19px; }
@@ -192,7 +195,7 @@ export function renderPoolsPage(data, subdomain) {
         <th>#</th><th>Пул</th><th>Сеть</th><th>Протокол</th>
         <th class="num">TVL</th><th class="num" id="apyHead">APY</th><th class="num">24ч объём</th>
       </tr></thead>
-      <tbody id="rows"></tbody>
+      <tbody id="rows"><tr><td colspan="7"><div class="spinner"></div></td></tr></tbody>
     </table>
   </div></div>
   <div class="note">Пары из основных токенов (watchlist), без мусорных пулов (TVL ≥ $0.5M, не outlier). APY за окно — среднее значение APY пула из истории DefiLlama за выбранный период; «—» если истории недостаточно.</div>

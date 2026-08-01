@@ -44,6 +44,13 @@ export const POOL_STABLE_TOKENS = [
   "USDC", "USDT", "DAI", "PYUSD", "FRAX", "USDE", "TUSD", "USD0",
 ];
 
+// Стейблкоины для категоризации активов в donut (символы, верхний регистр)
+export const STABLECOIN_SYMBOLS = new Set([
+  "USDC", "USDT", "DAI", "BUSD", "TUSD", "USDP", "GUSD", "LUSD", "FRAX", "USDE",
+  "USDS", "PYUSD", "USD0", "USD1", "USDG", "USDD", "EURC", "EURS", "EURT", "XUSD",
+  "SUSDS", "SUSDE", "CRVUSD", "GHO", "USDR", "USDC.E", "USDT.E", "USD₮0", "USDT0",
+]);
+
 // Человекочитаемые названия сетей
 export const CHAIN_NAMES = {  ethereum: "Ethereum",
   arbitrum: "Arbitrum",

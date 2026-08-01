@@ -1,4 +1,4 @@
-import { WALLETS } from "./config.js";
+import { WALLETS, STABLECOIN_SYMBOLS } from "./config.js";
 import { refreshRF, getRF } from "./rf.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
 
@@ -42,17 +42,26 @@ async function zerionPositions(address, apiKey) {
   if (!res.ok) throw new Error(`Zerion positions ${res.status}`);
   const j = await res.json();
   return (j.data || [])
+    .filter((p) => p.attributes?.flags?.displayable !== false) // отсекаем aToken-расписки и долговые токены
     .map((p) => {
       const a = p.attributes || {};
       const fi = a.fungible_info || {};
       const chain = p.relationships?.chain?.data?.id || a.chain?.id || "?";
+      const type = a.position_type || a.type || "wallet";
+      // Категория для donut: в DeFi / долг / стейблкоин / крипта
+      const symbol = (fi.symbol || "?").toUpperCase();
+      let cat;
+      if (type === "loan" || type === "borrowed") cat = "borrowed";
+      else if (type !== "wallet") cat = "defi";
+      else cat = STABLECOIN_SYMBOLS.has(symbol) ? "stable" : "crypto";
       return {
         value: Number(a.value) || 0,
         symbol: fi.symbol || "?",
         name: fi.name || fi.symbol || "?",
         icon: fi.icon?.url || "",
         chain,
-        type: a.position_type || a.type || "wallet",
+        type,
+        cat,
         protocol: a.protocol || "",
       };
     })
@@ -74,6 +83,11 @@ async function refreshAll(env) {
       zerionPortfolio(w.address, apiKey),
       zerionPositions(w.address, apiKey),
     ]);
+    // Категории активов для donut: стейблы / крипта / в DeFi / долг
+    const categories = { stable: 0, crypto: 0, defi: 0, borrowed: 0 };
+    if (pos.status === "fulfilled") {
+      for (const p of pos.value) categories[p.cat] = (categories[p.cat] || 0) + p.value;
+    }
     wallets.push({
       id: w.id,
       name: w.name,
@@ -83,6 +97,7 @@ async function refreshAll(env) {
       error: pf.status === "rejected" ? String(pf.reason?.message || pf.reason) : null,
       portfolio: pf.status === "fulfilled" ? pf.value : null,
       positions: pos.status === "fulfilled" ? pos.value : [],
+      categories,
       posError: pos.status === "rejected" ? String(pos.reason?.message || pos.reason) : null,
       checkedAt: new Date().toISOString(),
     });

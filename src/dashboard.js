@@ -7,22 +7,32 @@
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Invest Portfolio — Дашборд</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
   body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-         background:#f4f6fa; color:#1b2433; margin:0; padding:20px; }
+         background:#f4f6fa; color:#1b2433; margin:0; padding:20px; overflow-x:hidden;
+         -webkit-tap-highlight-color:transparent; }
+  svg { max-width:100%; height:auto; }
   .wrap { max-width:1280px; margin:0 auto; }
   h1 { font-size:22px; margin:0 0 4px; }
   .sub { color:#66718a; font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:16px; }
   @media (max-width:640px) {
-    body { padding:12px; }
+    body { padding:12px; padding-top:max(12px, env(safe-area-inset-top)); padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
     .cards { grid-template-columns:1fr; }
     h1 { font-size:19px; }
+    .src, .refresh { padding:10px 14px; }
   }
+  .spinner { width:30px; height:30px; border:3px solid #dbe3f7; border-top-color:#3b6ef5; border-radius:50%;
+             animation:spin .8s linear infinite; margin:40px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-txt { color:#8b93a7; font-size:13px; text-align:center; margin-top:-20px; padding-bottom:40px; }
+  .stats { display:flex; gap:16px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:#66718a; }
+  .stat b { color:#1b2433; }
+  .stat.debt b { color:#dc2626; }
   .card { background:#fff; border:1px solid #e4e8f0; border-radius:14px; padding:18px;
           box-shadow:0 1px 2px rgba(16,24,40,.04); }
   .card.comb { grid-column:1 / -1; margin-bottom:4px; }
@@ -70,7 +80,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     <button id="refresh" class="refresh">⟳ обновить сейчас</button>
     <a class="refresh" href="/pools">🔥 Горячие пулы</a></div>
   <div id="warn" class="warn" style="display:none"></div>
-  <div class="cards" id="cards"><div class="loading">Загрузка…</div></div>
+  <div class="cards" id="cards"><div class="spinner"></div><div class="loading-txt">Загружаем портфели…</div></div>
 </div>
 <script>
 var COLORS = ["#7aa2ff","#3ddc84","#ffb454","#ff7a9c","#9b7aff","#5bd3c7","#e05f9e","#8bd450","#ff8a5c","#5c8aff","#d4d450","#b55cd4","#50d4b4","#ff5c5c","#4fd4e0"];
@@ -116,22 +126,36 @@ function legend(entries) {
   }).join("");
 }
 function combined(snap) {
-  var chains = {}, total = 0, num = 0, den = 0;
+  var cats = { stable:0, crypto:0, defi:0, borrowed:0 }, total = 0, num = 0, den = 0;
   snap.wallets.forEach(function(w){
     if (!w.ok || !w.portfolio) return;
     total += w.portfolio.total || 0;
-    var ch = w.portfolio.chains || {};
-    Object.keys(ch).forEach(function(id){ chains[id] = (chains[id] || 0) + ch[id]; });
+    var c = w.categories || {};
+    cats.stable += c.stable || 0;
+    cats.crypto += c.crypto || 0;
+    cats.defi += c.defi || 0;
+    cats.borrowed += c.borrowed || 0;
     var pct = w.portfolio.changes && w.portfolio.changes.percent_1d;
     if (pct !== undefined && w.portfolio.total) { num += w.portfolio.total * pct; den += w.portfolio.total; }
   });
-  var arr = Object.keys(chains).map(function(id){ return { label: chainName(id), value: chains[id] }; })
-    .sort(function(a,b){ return b.value - a.value; });
-  var top = arr.slice(0, 8), rest = 0;
-  for (var i = 8; i < arr.length; i++) rest += arr[i].value;
-  if (rest > 0) top.push({ label: "Прочее", value: rest });
-  top.forEach(function(e, i){ e.color = COLORS[i]; });
-  return { total: total, change: den ? num / den : undefined, top: top };
+  var top = [
+    { label:"Стейблкоины", value:cats.stable, color:"#3ddc84" },
+    { label:"Криптовалюта", value:cats.crypto, color:"#7aa2ff" },
+    { label:"В DeFi", value:cats.defi, color:"#ffb454" },
+  ].filter(function(e){ return e.value > 0; });
+  return { total: total, change: den ? num / den : undefined, top: top, cats: cats };
+}
+// Строка «в пулах vs на кошельке» (как у Krystal) + долг, если есть
+function defiRow(c) {
+  c = c || {};
+  var defi = c.defi || 0, wallet = (c.stable || 0) + (c.crypto || 0), borrowed = c.borrowed || 0;
+  var assets = defi + wallet;
+  if (!assets) return "";
+  var p = Math.round(defi / assets * 100);
+  var html = '<div class="stats"><span class="stat">💰 В пулах: <b>' + fmtUSD(defi) + '</b> (' + p + '%)</span>' +
+    '<span class="stat">💼 На кошельке: <b>' + fmtUSD(wallet) + '</b></span>';
+  if (borrowed > 0) html += '<span class="stat debt">💳 Долг: <b>' + fmtUSD(borrowed) + '</b></span>';
+  return html + '</div>';
 }
 function walletCard(w, wi) {
   if (!w.ok) {
@@ -158,6 +182,7 @@ function walletCard(w, wi) {
     '<span class="time">' + new Date(w.checkedAt).toLocaleString("ru-RU") + "</span></div>" +
     '<div class="url">' + esc(w.address) + " · " + shortAddr(w.address) + "</div>" +
     '<div class="total-row"><span class="total">' + fmtUSD(pf.total) + "</span> " + chgHtml(change) + "</div>" +
+    defiRow(w.categories) +
     '<h3 class="sec">Активы</h3>' + (rows || '<div class="err-msg">нет активов</div>') + srcLinks(w) + "</div>";
 }
 function srcLinks(w) {
@@ -179,6 +204,7 @@ function render(snap) {
     html += '<div class="card comb"><div class="head"><b>Все кошельки</b> <span class="ok">OK</span>' +
       '<span class="time">' + new Date(snap.updatedAt).toLocaleString("ru-RU") + "</span></div>" +
       '<div class="total-row"><span class="total big">' + fmtUSD(c.total) + "</span> " + chgHtml(c.change) + "</div>" +
+      defiRow(c.cats) +
       '<div class="chart-wrap">' + donut(c.top, 230, 30) + '<div class="legend">' + legend(c.top) + "</div></div></div>";
   }
   snap.wallets.forEach(function(w, i){ html += walletCard(w, i); });
