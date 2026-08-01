@@ -6,6 +6,7 @@ const KV_KEY = "snapshot";
 // Ключи KV для страницы «Горячие пулы» (готовые строки, рендерит скрипт sync-pools)
 const KV_POOLS_HTML = "poolsHtml";
 const KV_POOLS_JSON = "poolsJson";
+const KV_RATES = "defiRates"; // APR/TVL по протоколам (строит sync-pools.mjs из дампа DefiLlama)
 
 // ---------- Zerion API ----------
 function zerionAuth(apiKey) {
@@ -75,6 +76,40 @@ async function zerionPositions(address, apiKey) {
     .sort((x, y) => y.value - x.value);
 }
 
+// ---------- Aave V3 Health Factor (on-chain, как в DeBank) ----------
+const AAVE_V3 = {
+  arbitrum: { pool: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", rpc: "https://arb1.arbitrum.io/rpc" },
+  base: { pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5", rpc: "https://mainnet.base.org" },
+  ethereum: { pool: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2", rpc: "https://eth.llamarpc.com" },
+};
+
+async function aaveHealth(walletAddress, positions) {
+  const aave = positions.find((p) => p.protocol === "Aave V3");
+  if (!aave) return null;
+  const cfg = AAVE_V3[aave.chain];
+  if (!cfg) return null;
+  const addr = walletAddress.slice(2).toLowerCase();
+  const data = "0xbf92857c" + "0".repeat(24) + addr; // getUserAccountData(address)
+  try {
+    const res = await fetch(cfg.rpc, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: cfg.pool, data }, "latest"] }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const hex = j.result;
+    if (!hex || hex.length < 2 + 6 * 64) return null;
+    const read = (i) => BigInt("0x" + hex.slice(2 + i * 64, 2 + (i + 1) * 64));
+    const collateral = Number(read(0)) / 1e8;
+    const debt = Number(read(1)) / 1e8;
+    const hf = Number(read(5)) / 1e18;
+    return { collateral, debt, hf, hasDebt: debt > 1 };
+  } catch (e) {
+    return null;
+  }
+}
+
 // ---------- Обновление и кэш (портфель) ----------
 async function refreshAll(env) {
   const apiKey = env.ZERION_API_KEY;
@@ -94,6 +129,8 @@ async function refreshAll(env) {
     if (pos.status === "fulfilled") {
       for (const p of pos.value) categories[p.cat] = (categories[p.cat] || 0) + p.value;
     }
+    // Health Factor Aave V3 (on-chain) — только если есть Aave-позиции
+    const health = pos.status === "fulfilled" ? await aaveHealth(w.address, pos.value) : null;
     wallets.push({
       id: w.id,
       name: w.name,
@@ -104,6 +141,7 @@ async function refreshAll(env) {
       portfolio: pf.status === "fulfilled" ? pf.value : null,
       positions: pos.status === "fulfilled" ? pos.value : [],
       categories,
+      health,
       posError: pos.status === "rejected" ? String(pos.reason?.message || pos.reason) : null,
       checkedAt: new Date().toISOString(),
     });
@@ -183,6 +221,35 @@ export default {
         const raw = await env.DATA.get(KV_POOLS_JSON);
         if (!raw) return json({ error: "ещё не синхронизировано (запусти scripts/sync-pools.mjs)", updatedAt: null });
         return new Response(raw, { headers: { "content-type": "application/json; charset=utf-8" } });
+      }
+      if (url.pathname === "/api/defirates") {
+        // Клиент запрашивает ТОЛЬКО нужные ключи: /api/defirates?q=Сеть~проект~символ,...
+        // Извлекаем их regex'ом из чанка (KV-чтение 126KB — I/O, без парсинга всего).
+        const q = url.searchParams.get("q") || "";
+        if (!q) return json({});
+        const want = {};
+        for (const item of q.split(",")) {
+          const parts = item.split("~");
+          if (parts.length < 3) continue;
+          const chain = decodeURIComponent(parts[0]);
+          const key = decodeURIComponent(parts[1]) + "|" + decodeURIComponent(parts[2]);
+          (want[chain] = want[chain] || []).push(key);
+        }
+        const out = {};
+        for (const chain of Object.keys(want)) {
+          const raw = await env.DATA.get(KV_RATES + ":" + chain);
+          if (!raw) continue;
+          const all = {};
+          const re = /"([^"]+)":(\{[^}]+\})/g;
+          let mm;
+          while ((mm = re.exec(raw))) {
+            try { all[mm[1]] = JSON.parse(mm[2]); } catch (e) { /* пропускаем */ }
+          }
+          for (const k of want[chain]) {
+            if (all[k]) out[chain + "~" + k.replace("|", "~")] = all[k];
+          }
+        }
+        return json(out);
       }
       if (url.pathname === "/api/rf") {
         const rf = await getRF(env);

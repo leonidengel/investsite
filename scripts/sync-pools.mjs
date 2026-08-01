@@ -23,6 +23,47 @@ const OUT = path.join(ROOT, ".sync-out");
 const YIELDS_URL = "https://yields.llama.fi/pools";
 const SUBDOMAIN = "portfolio.leonidengel.workers.dev";
 
+// Нормализация символов для сверки с DefiLlama (USDT0/USD₮0 → USDT и т.п.)
+function normSym(s) {
+  let t = String(s || "").toUpperCase();
+  t = t.replace(/\.(E|B|W)$/, "");
+  if (t === "USD₮0" || t === "USDT0") t = "USDT";
+  return t;
+}
+
+// Карта ставок (APR/TVL) по протоколам наших позиций: лендинг по символу,
+// DEX-пары по обоим порядкам. Сгруппирована по сетям — пишем отдельным KV-ключом
+// на сеть (большой единый ответ не проходит через лимит бесплатного тарифа).
+// Ключ внутри сети: "проект|символ" или "проект|PAIR:A-B".
+const RATE_PROJECTS = new Set([
+  "aave-v3", "aave-v4", "morpho-blue", "uniswap-v3", "uniswap-v4",
+  "pancakeswap-amm-v3", "pancakeswap-amm",
+]);
+function buildRates(dump) {
+  const byChain = {};
+  const consider = (chain, key, apy, tvl) => {
+    if (!chain || !key) return;
+    const m = byChain[chain] || (byChain[chain] = {});
+    const prev = m[key];
+    if (!prev || (tvl || 0) > (prev.t || 0)) {
+      m[key] = { a: apy != null ? +Number(apy).toFixed(2) : null, t: Math.round(tvl || 0) };
+    }
+  };
+  for (const p of dump) {
+    if (!RATE_PROJECTS.has(p.project)) continue;
+    const apy = p.apyBase ?? p.apy ?? null;
+    const tvl = p.tvlUsd || 0;
+    const sym = normSym(p.symbol);
+    consider(p.chain, `${p.project}|${sym}`, apy, tvl);
+    const toks = String(p.symbol || "").split("-").filter(Boolean).map(normSym);
+    if (toks.length === 2) {
+      consider(p.chain, `${p.project}|PAIR:${toks[0]}-${toks[1]}`, apy, tvl);
+      consider(p.chain, `${p.project}|PAIR:${toks[1]}-${toks[0]}`, apy, tvl);
+    }
+  }
+  return byChain;
+}
+
 async function main() {
   console.log("[sync-pools] скачиваю дамп DefiLlama…");
   const res = await fetch(YIELDS_URL);
@@ -37,15 +78,26 @@ async function main() {
 
   const html = renderPoolsPage(data, SUBDOMAIN);
   const json = renderApiJson(data);
+  const ratesByChain = buildRates(dump);
   fs.mkdirSync(OUT, { recursive: true });
   const htmlFile = path.join(OUT, "pools.html");
   const jsonFile = path.join(OUT, "pools.json");
   fs.writeFileSync(htmlFile, html);
   fs.writeFileSync(jsonFile, json);
-  console.log(`[sync-pools] рендер: html ${(html.length / 1024).toFixed(1)}KB, json ${(json.length / 1024).toFixed(1)}KB`);
+  const totalBytes = Object.entries(ratesByChain).reduce((s, [, m]) => s + JSON.stringify(m).length, 0);
+  console.log(`[sync-pools] рендер: html ${(html.length / 1024).toFixed(1)}KB, json ${(json.length / 1024).toFixed(1)}KB, rates по ${Object.keys(ratesByChain).length} сетям (${(totalBytes / 1024).toFixed(1)}KB всего)`);
 
   await putKV("poolsHtml", htmlFile);
   await putKV("poolsJson", jsonFile);
+  // Ставки: индекс + по одному ключу на сеть (большой единый ответ не проходит)
+  const ratesIndexFile = path.join(OUT, "defirates-index.json");
+  fs.writeFileSync(ratesIndexFile, JSON.stringify({ chains: Object.keys(ratesByChain).sort() }));
+  await putKV("defiRates", ratesIndexFile);
+  for (const [chain, m] of Object.entries(ratesByChain)) {
+    const f = path.join(OUT, `defirates-${chain.replace(/[^a-z0-9-]/gi, "_")}.json`);
+    fs.writeFileSync(f, JSON.stringify(m));
+    await putKV(`defiRates:${chain}`, f);
+  }
   console.log("[sync-pools] готово ✔");
 }
 

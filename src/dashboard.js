@@ -61,10 +61,19 @@ export const DASHBOARD_HTML = `<!doctype html>
   .arow { display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid #f0f2f7; font-size:12px; }
   .lp { border:1px solid #e8ecf4; border-radius:10px; padding:10px 12px; margin:8px 0; background:#fafbff; }
   .lp-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .lp-main { flex:1; min-width:0; }
   .lp-pair b { font-size:13px; }
   .lp-id { color:#8b93a7; font-size:10px; font-weight:400; }
-  .lp-sub { color:#8b93a7; font-size:10px; flex:1; min-width:120px; }
-  .lp-total { font-weight:700; font-size:13px; }
+  .lp-sub { color:#8b93a7; font-size:10px; }
+  .lp-rate { align-self:center; color:#0e9f6e; font-size:11px; font-weight:600; white-space:nowrap; }
+  .lp-total { font-weight:700; font-size:13px; align-self:center; }
+  .lp-sec { font-size:10px; color:#8b93a7; text-transform:uppercase; letter-spacing:.5px; margin:8px 0 2px; }
+  .lp-apy { font-size:11px; font-weight:600; color:#0e9f6e; white-space:nowrap; }
+  .lp-apy.down { color:#dc2626; }
+  .lp-hf { font-size:11px; font-weight:700; white-space:nowrap; align-self:center; }
+  .hf-ok { color:#0e9f6e; }
+  .hf-warn { color:#d97706; }
+  .hf-bad { color:#dc2626; }
   .lp-toks { margin-top:8px; border-top:1px dashed #e4e8f0; }
   .lp-tok { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; }
   .lp-sym { width:70px; font-weight:600; flex-shrink:0; }
@@ -97,6 +106,32 @@ export const DASHBOARD_HTML = `<!doctype html>
 var COLORS = ["#7aa2ff","#3ddc84","#ffb454","#ff7a9c","#9b7aff","#5bd3c7","#e05f9e","#8bd450","#ff8a5c","#5c8aff","#d4d450","#b55cd4","#50d4b4","#ff5c5c","#4fd4e0"];
 var TYPE_NAMES = { wallet:"кошелёк", deposit:"депозит", loan:"займ", borrowed:"займ", staked:"стейк", locked:"лок", vesting:"вестинг", reward:"награда" };
 var CHAIN_NAMES = { ethereum:"Ethereum", arbitrum:"Arbitrum", optimism:"Optimism", base:"Base", polygon:"Polygon", bsc:"BNB Chain", "binance-smart-chain":"BNB Chain", monad:"Monad", avalanche:"Avalanche", solana:"Solana", fantom:"Fantom", linea:"Linea", zksync:"zkSync", mantle:"Mantle", gnosis:"Gnosis", celo:"Celo", xdai:"Gnosis", "avalanche-c":"Avalanche" };
+
+// Zerion-сеть/протокол → имена DefiLlama для сверки ставок (APR/TVL)
+var DL_CHAINS = { ethereum:"Ethereum", arbitrum:"Arbitrum", optimism:"OP Mainnet", base:"Base", polygon:"Polygon", "binance-smart-chain":"BSC", bsc:"BSC", avalanche:"Avalanche", fantom:"Fantom", linea:"Linea", mantle:"Mantle", monad:"Monad", solana:"Solana", scroll:"Scroll", blast:"Blast", sei:"Sei", zksync:"ZKsync Era", gnosis:"Gnosis", celo:"Celo" };
+var DL_PROJ = { "Uniswap V3":"uniswap-v3", "Uniswap V4":"uniswap-v4", "PancakeSwap V3":"pancakeswap-amm-v3", "Aave V3":"aave-v3", "Aave V4":"aave-v4", "Aave V2":"aave-v3", "Morpho":"morpho-blue", "Morpho Blue":"morpho-blue" };
+function normSymDL(s){ var t = String(s||"").toUpperCase(); t = t.replace(/\.(E|B|W)$/,""); if (t === "USD₮0" || t === "USDT0") t = "USDT"; return t; }
+var RATES = {}; // ключ "Сеть~проект~символ" → { a: apy, t: tvl }
+function dlChainOf(chainId){ return DL_CHAINS[chainId]; }
+function rItem(chainId, protocol, sym){
+  var c = dlChainOf(chainId), p = DL_PROJ[protocol];
+  if (!c || !p) return null;
+  return c + "~" + p + "~" + normSymDL(sym);
+}
+function rateFor(chainId, protocol, symbol){ var it = rItem(chainId, protocol, symbol); return it ? RATES[it] : null; }
+function pairRate(chainId, protocol, sym1, sym2){
+  var c = dlChainOf(chainId), p = DL_PROJ[protocol];
+  if (!c || !p) return null;
+  var a = normSymDL(sym1), b = normSymDL(sym2);
+  return RATES[c + "~" + p + "~PAIR:" + a + "-" + b] || RATES[c + "~" + p + "~PAIR:" + b + "-" + a];
+}
+function fmtMoney(v) {
+  if (v == null) return "—";
+  if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B";
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
+  if (v >= 1e3) return "$" + (v / 1e3).toFixed(1) + "K";
+  return "$" + Math.round(v);
+}
 
 function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function fmtUSD(v) {
@@ -182,24 +217,42 @@ function parsePool(name) {
   if (!m) return { protocol: name, pair: name, id: "" };
   return { protocol: m[1], pair: m[2] + "/" + m[3], id: "#" + m[4] };
 }
-// Группируем позиции: LP-пары (одинаковый pool) — одной карточкой, остальное — как есть.
-// В пару включаем только «позиционные» типы (депозит/стейк/лок); награды — обычными строками.
+// Группируем позиции: LP-пары (одинаковый pool) — одной карточкой; лендинг
+// (Aave/Morpho, протокол + депозит/займ) — карточками как в DeBank; остальное — как есть.
 var LP_TYPES = { deposit: 1, staked: 1, locked: 1, vesting: 1 };
+var LEND_TYPES = { deposit: 1, staked: 1, locked: 1, vesting: 1, loan: 1, borrowed: 1 };
 function groupPositions(pos) {
-  var pools = {}, regular = [];
+  var pools = {}, lend = {}, regular = [];
   pos.forEach(function(a){
     if (a.pool && LP_TYPES[a.type]) {
       var g = pools[a.pool] || (pools[a.pool] = { name: a.pool, protocol: a.protocol, chain: a.chain, tokens: [], total: 0 });
       g.tokens.push(a);
       g.total += a.value;
+    } else if (a.protocol && LEND_TYPES[a.type]) {
+      var key = a.protocol + "|" + a.chain;
+      var l = lend[key] || (lend[key] = { protocol: a.protocol, chain: a.chain, deposits: [], borrows: [], total: 0 });
+      (a.type === "loan" || a.type === "borrowed" ? l.borrows : l.deposits).push(a);
+      l.total += a.value;
     } else {
       regular.push(a);
     }
   });
-  return { lp: Object.keys(pools).map(function(k){ return pools[k]; }), regular: regular };
+  return {
+    lp: Object.keys(pools).map(function(k){ return pools[k]; }),
+    lend: Object.keys(lend).map(function(k){ return lend[k]; }),
+    regular: regular,
+  };
 }
 function lpCard(g) {
   var pp = parsePool(g.name);
+  var rate = pairRate(g.chain, g.protocol, g.tokens[0].symbol, g.tokens.length > 1 ? g.tokens[1].symbol : g.tokens[0].symbol);
+  var rateHtml = "";
+  if (rate && (rate.a > 0 || rate.t > 0)) {
+    var parts = [];
+    if (rate.a > 0) parts.push("APR " + rate.a.toFixed(1) + "%");
+    if (rate.t > 0) parts.push("TVL " + fmtMoney(rate.t));
+    rateHtml = '<div class="lp-rate">' + parts.join(" · ") + "</div>";
+  }
   var tokens = g.tokens.map(function(t){
     var amt = t.amount != null ? fmtAmount(t.amount) : "—";
     var icon = t.icon
@@ -211,10 +264,40 @@ function lpCard(g) {
       '<span class="lp-val">' + fmtUSD(t.value) + "</span></div>";
   }).join("");
   return '<div class="lp">' +
-    '<div class="lp-head"><div class="lp-pair"><b>' + esc(pp.pair.split("/").join(" / ")) + '</b> <span class="lp-id">' + esc(pp.id) + "</span></div>" +
-    '<div class="lp-sub">' + esc(pp.protocol) + " · " + chainName(g.chain) + " · " + esc(TYPE_NAMES[g.tokens[0].type] || g.tokens[0].type) + "</div>" +
+    '<div class="lp-head"><div class="lp-main"><div class="lp-pair"><b>' + esc(pp.pair.split("/").join(" / ")) + '</b> <span class="lp-id">' + esc(pp.id) + "</span></div>" +
+    '<div class="lp-sub">' + esc(pp.protocol) + " · " + chainName(g.chain) + " · " + esc(TYPE_NAMES[g.tokens[0].type] || g.tokens[0].type) + "</div></div>" +
+    rateHtml +
     '<div class="lp-total">' + fmtUSD(g.total) + "</div></div>" +
     '<div class="lp-toks">' + tokens + "</div></div>";
+}
+// Карточка лендинга (Aave/Morpho) в стиле DeBank: депозиты + займы с APY и Health Factor
+function lendingCard(l, health) {
+  var row = function(a, borrow){
+    var apy = rateFor(l.chain, l.protocol, a.symbol);
+    var apyHtml = apy && apy.a > 0
+      ? '<span class="lp-apy' + (borrow ? " down" : "") + '">' + apy.a.toFixed(2) + "%</span>"
+      : "";
+    var icon = a.icon
+      ? '<img class="ic" src="' + esc(a.icon) + '" alt="" onerror="this.remove()"/>'
+      : '<span class="ic ph-ic">' + esc(a.symbol.slice(0,1)) + "</span>";
+    var amt = a.amount != null ? fmtAmount(a.amount) : "—";
+    return '<div class="lp-tok">' + icon +
+      '<span class="lp-sym">' + esc(a.symbol) + "</span>" +
+      '<span class="lp-amt">' + amt + "</span>" + apyHtml +
+      '<span class="lp-val">' + fmtUSD(a.value) + "</span></div>";
+  };
+  var hfHtml = "";
+  if (health && health.hasDebt && /aave/i.test(l.protocol)) {
+    var cls = health.hf >= 1.5 ? "hf-ok" : health.hf >= 1.1 ? "hf-warn" : "hf-bad";
+    hfHtml = '<span class="lp-hf ' + cls + '">Здоровье ' + health.hf.toFixed(2) + "</span>";
+  }
+  var html = '<div class="lp"><div class="lp-head"><div class="lp-main"><div class="lp-pair"><b>' + esc(l.protocol) + "</b></div>" +
+    '<div class="lp-sub">' + chainName(l.chain) + "</div></div>" +
+    hfHtml +
+    '<div class="lp-total">' + fmtUSD(l.total) + "</div></div>";
+  if (l.deposits.length) html += '<div class="lp-sec">В депозитах</div>' + l.deposits.map(function(a){ return row(a, false); }).join("");
+  if (l.borrows.length) html += '<div class="lp-sec">Займы</div>' + l.borrows.map(function(a){ return row(a, true); }).join("");
+  return html + "</div>";
 }
 function walletCard(w, wi) {
   if (!w.ok) {
@@ -227,7 +310,8 @@ function walletCard(w, wi) {
   var grouped = groupPositions(w.positions);
   var assetsTotal = w.positions.reduce(function(s,a){ return s + a.value; }, 0) || 1;
   var lpCards = grouped.lp.map(lpCard).join("");
-  var rows = grouped.regular.slice(0, 12).map(function(a){
+  var lendCards = grouped.lend.map(function(l){ return lendingCard(l, w.health); }).join("");
+  var rows = grouped.regular.slice(0, 10).map(function(a){
     var pct = a.value / assetsTotal * 100;
     var icon = a.icon
       ? '<img class="ic" src="' + esc(a.icon) + '" alt="" onerror="this.remove()"/>'
@@ -243,7 +327,7 @@ function walletCard(w, wi) {
     '<div class="url">' + esc(w.address) + " · " + shortAddr(w.address) + "</div>" +
     '<div class="total-row"><span class="total">' + fmtUSD(pf.total) + "</span> " + chgHtml(change) + "</div>" +
     defiRow(w.categories) +
-    '<h3 class="sec">Активы</h3>' + (lpCards + rows || '<div class="err-msg">нет активов</div>') + srcLinks(w) + "</div>";
+    '<h3 class="sec">Активы</h3>' + (lpCards + lendCards + rows || '<div class="err-msg">нет активов</div>') + srcLinks(w) + "</div>";
 }
 function srcLinks(w) {
   var links = (w.sources || []).map(function(s){
@@ -273,7 +357,38 @@ function render(snap) {
 document.getElementById("refresh").addEventListener("click", function(){
   fetch("/api/refresh").then(function(){ location.reload(); });
 });
-fetch("/api/data").then(function(r){ return r.json(); }).then(render).catch(function(e){
+Promise.all([
+  fetch("/api/data").then(function(r){ return r.json(); }),
+]).then(function(arr){
+  var snap = arr[0];
+  // Собираем ключи ставок, которые реально нужны (LP-пары + лендинг по символам)
+  var want = {};
+  var add = function(it){ if (it) want[it] = 1; };
+  var pools = {};
+  (snap.wallets || []).forEach(function(w){
+    (w.positions || []).forEach(function(p){
+      if (p.pool && LP_TYPES[p.type]) (pools[p.pool] = pools[p.pool] || []).push(p);
+      if (p.protocol && DL_PROJ[p.protocol]) add(rItem(p.chain, p.protocol, p.symbol));
+    });
+  });
+  Object.keys(pools).forEach(function(k){
+    var t = pools[k];
+    if (t.length < 2) return;
+    var c = dlChainOf(t[0].chain), p = DL_PROJ[t[0].protocol];
+    if (!c || !p) return;
+    var a = normSymDL(t[0].symbol), b = normSymDL(t[1].symbol);
+    add(c + "~" + p + "~PAIR:" + a + "-" + b);
+    add(c + "~" + p + "~PAIR:" + b + "-" + a);
+  });
+  var q = Object.keys(want);
+  if (!q.length) { render(snap); return; }
+  return fetch("/api/defirates?q=" + encodeURIComponent(q.join(",")))
+    .then(function(r){ return r.json(); })
+    .then(function(m){
+      RATES = m || {};
+      render(snap);
+    });
+}).catch(function(e){
   document.getElementById("cards").innerHTML = '<div class="loading">Ошибка загрузки: ' + esc(e.message) + "</div>";
 });
 </script>
