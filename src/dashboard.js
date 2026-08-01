@@ -59,6 +59,17 @@ export const DASHBOARD_HTML = `<!doctype html>
   .lval { color:#8b93a7; }
   h3.sec { font-size:12px; color:#66718a; margin:14px 0 8px; text-transform:uppercase; letter-spacing:.5px; }
   .arow { display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid #f0f2f7; font-size:12px; }
+  .lp { border:1px solid #e8ecf4; border-radius:10px; padding:10px 12px; margin:8px 0; background:#fafbff; }
+  .lp-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .lp-pair b { font-size:13px; }
+  .lp-id { color:#8b93a7; font-size:10px; font-weight:400; }
+  .lp-sub { color:#8b93a7; font-size:10px; flex:1; min-width:120px; }
+  .lp-total { font-weight:700; font-size:13px; }
+  .lp-toks { margin-top:8px; border-top:1px dashed #e4e8f0; }
+  .lp-tok { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; }
+  .lp-sym { width:70px; font-weight:600; flex-shrink:0; }
+  .lp-amt { flex:1; color:#66718a; font-variant-numeric:tabular-nums; }
+  .lp-val { color:#1b2433; font-weight:600; font-variant-numeric:tabular-nums; }
   .ic { width:22px; height:22px; border-radius:50%; flex-shrink:0; }
   .ph-ic { background:#eef2f7; color:#66718a; display:flex; align-items:center; justify-content:center; font-size:10px; }
   .aname { width:110px; flex-shrink:0; }
@@ -157,6 +168,54 @@ function defiRow(c) {
   if (borrowed > 0) html += '<span class="stat debt">💳 Долг: <b>' + fmtUSD(borrowed) + '</b></span>';
   return html + '</div>';
 }
+function fmtAmount(v) {
+  if (v == null || isNaN(v)) return "—";
+  if (v >= 1000) return v.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (v >= 1) return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return v.toLocaleString("en-US", { maximumFractionDigits: 6 });
+}
+// Разбираем «PancakeSwap V3 USDT/USDe Pool (#7038688)» → { protocol, pair, id }
+// Пара — последний сегмент с "/" перед " Pool (#id)". ВАЖНО: внутри внешнего
+// шаблона-литерала бэкслеши удваиваются (\\\\ → \\ в клиенте).
+function parsePool(name) {
+  var m = name.match(/^(.*?)\\s+([^\\s/]+)\\/([^\\s/]+)\\s+Pool\\s+\\(#(\\d+)\\)$/);
+  if (!m) return { protocol: name, pair: name, id: "" };
+  return { protocol: m[1], pair: m[2] + "/" + m[3], id: "#" + m[4] };
+}
+// Группируем позиции: LP-пары (одинаковый pool) — одной карточкой, остальное — как есть.
+// В пару включаем только «позиционные» типы (депозит/стейк/лок); награды — обычными строками.
+var LP_TYPES = { deposit: 1, staked: 1, locked: 1, vesting: 1 };
+function groupPositions(pos) {
+  var pools = {}, regular = [];
+  pos.forEach(function(a){
+    if (a.pool && LP_TYPES[a.type]) {
+      var g = pools[a.pool] || (pools[a.pool] = { name: a.pool, protocol: a.protocol, chain: a.chain, tokens: [], total: 0 });
+      g.tokens.push(a);
+      g.total += a.value;
+    } else {
+      regular.push(a);
+    }
+  });
+  return { lp: Object.keys(pools).map(function(k){ return pools[k]; }), regular: regular };
+}
+function lpCard(g) {
+  var pp = parsePool(g.name);
+  var tokens = g.tokens.map(function(t){
+    var amt = t.amount != null ? fmtAmount(t.amount) : "—";
+    var icon = t.icon
+      ? '<img class="ic" src="' + esc(t.icon) + '" alt="" onerror="this.remove()"/>'
+      : '<span class="ic ph-ic">' + esc(t.symbol.slice(0,1)) + "</span>";
+    return '<div class="lp-tok">' + icon +
+      '<span class="lp-sym">' + esc(t.symbol) + "</span>" +
+      '<span class="lp-amt">' + amt + "</span>" +
+      '<span class="lp-val">' + fmtUSD(t.value) + "</span></div>";
+  }).join("");
+  return '<div class="lp">' +
+    '<div class="lp-head"><div class="lp-pair"><b>' + esc(pp.pair.split("/").join(" / ")) + '</b> <span class="lp-id">' + esc(pp.id) + "</span></div>" +
+    '<div class="lp-sub">' + esc(pp.protocol) + " · " + chainName(g.chain) + " · " + esc(TYPE_NAMES[g.tokens[0].type] || g.tokens[0].type) + "</div>" +
+    '<div class="lp-total">' + fmtUSD(g.total) + "</div></div>" +
+    '<div class="lp-toks">' + tokens + "</div></div>";
+}
 function walletCard(w, wi) {
   if (!w.ok) {
     return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="err">ERR</span>' +
@@ -165,9 +224,10 @@ function walletCard(w, wi) {
       '<div class="err-msg">' + esc(w.error) + "</div>" + srcLinks(w) + "</div>";
   }
   var pf = w.portfolio, change = pf.changes && pf.changes.percent_1d;
-  var assets = w.positions.slice(0, 15);
+  var grouped = groupPositions(w.positions);
   var assetsTotal = w.positions.reduce(function(s,a){ return s + a.value; }, 0) || 1;
-  var rows = assets.map(function(a){
+  var lpCards = grouped.lp.map(lpCard).join("");
+  var rows = grouped.regular.slice(0, 12).map(function(a){
     var pct = a.value / assetsTotal * 100;
     var icon = a.icon
       ? '<img class="ic" src="' + esc(a.icon) + '" alt="" onerror="this.remove()"/>'
@@ -183,7 +243,7 @@ function walletCard(w, wi) {
     '<div class="url">' + esc(w.address) + " · " + shortAddr(w.address) + "</div>" +
     '<div class="total-row"><span class="total">' + fmtUSD(pf.total) + "</span> " + chgHtml(change) + "</div>" +
     defiRow(w.categories) +
-    '<h3 class="sec">Активы</h3>' + (rows || '<div class="err-msg">нет активов</div>') + srcLinks(w) + "</div>";
+    '<h3 class="sec">Активы</h3>' + (lpCards + rows || '<div class="err-msg">нет активов</div>') + srcLinks(w) + "</div>";
 }
 function srcLinks(w) {
   var links = (w.sources || []).map(function(s){

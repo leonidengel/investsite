@@ -54,15 +54,21 @@ async function zerionPositions(address, apiKey) {
       if (type === "loan" || type === "borrowed") cat = "borrowed";
       else if (type !== "wallet") cat = "defi";
       else cat = STABLECOIN_SYMBOLS.has(symbol) ? "stable" : "crypto";
+      // LP-позиция: Zerion именует её «Uniswap V3 WETH/USDC Pool (#5680233)» —
+      // по этому имени группируем две половины пары в одну позицию
+      const posName = String(a.name || "");
+      const isPoolPos = /Pool \(#\d+\)$/.test(posName);
       return {
         value: Number(a.value) || 0,
         symbol: fi.symbol || "?",
-        name: fi.name || fi.symbol || "?",
+        name: isPoolPos ? posName : fi.name || fi.symbol || "?",
         icon: fi.icon?.url || "",
         chain,
         type,
         cat,
         protocol: a.protocol || "",
+        pool: isPoolPos ? posName : null, // ключ группы LP-пары
+        amount: a.quantity?.float ?? null, // количество токена в позиции
       };
     })
     .filter((p) => p.value > 0)
