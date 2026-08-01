@@ -1,0 +1,30 @@
+name: Sync Pools
+
+# Обновляет «Горячие пулы» в Cloudflare KV раз в час.
+# Тяжёлый парсинг дампа DefiLlama (10.9MB) выполняется здесь, в CI —
+# на бесплатном тарифе Workers на это не хватает CPU (10мс).
+# Нужные секреты: CLOUDFLARE_API_TOKEN (токен с правами "Edit Cloudflare Workers KV Storage")
+# и CLOUDFLARE_ACCOUNT_ID (ID аккаунта, см. npx wrangler whoami).
+
+on:
+  schedule:
+    - cron: "17 * * * *" # раз в час (не на ровном часу)
+  workflow_dispatch: {} # ручной запуск
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sync pools to KV
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/sync-pools.mjs

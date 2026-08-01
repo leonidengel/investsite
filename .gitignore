@@ -1,0 +1,12 @@
+# Служебное wrangler
+.wrangler/
+.sync-out/
+node_modules/
+
+# Системное
+.DS_Store
+
+# Секреты и доступы — НЕ пушим в репозиторий!
+credentials/
+*.local
+.shots-*

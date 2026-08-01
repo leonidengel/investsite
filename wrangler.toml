@@ -1,0 +1,12 @@
+name = "portfolio"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Крон: раз в 15 минут ходим на целевые сайты и обновляем данные
+[triggers]
+crons = ["*/15 * * * *"]
+
+# KV для кэша данных между кроном и визитами посетителей
+[[kv_namespaces]]
+binding = "DATA"
+id = "4456a772c48d459c8470e322052c0c4c"
