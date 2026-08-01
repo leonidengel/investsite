@@ -45,12 +45,14 @@
 тарифа Workers, поэтому пулы обновляет внешний скрипт:
 
 ```bash
-node scripts/sync-pools.mjs   # локально (wrangler уже авторизован на этом Mac)
+node scripts/sync-pools.mjs   # вручную (wrangler уже авторизован на этом Mac)
 ```
 
-Автономно — **GitHub Actions** (`.github/workflows/sync-pools.yml`, раз в час):
-нужен репозиторий + секреты `CLOUDFLARE_API_TOKEN` (права Edit Cloudflare
-Workers KV Storage) и `CLOUDFLARE_ACCOUNT_ID` (см. `npx wrangler whoami`).
+**Автономно — GitHub Actions** (`.github/workflows/sync-pools.yml`):
+- Репозиторий: **https://github.com/leonidengel/investsite** (публичный)
+- Расписание: `17 * * * *` (раз в час, UTC) + ручной запуск (`workflow_dispatch`) + на push
+- Секреты: `CLOUDFLARE_API_TOKEN` (шаблон «Edit Cloudflare Workers») и
+  `CLOUDFLARE_ACCOUNT_ID` (оба уже заданы)
 
 Список токенов для пулов: `src/config.js` → `POOL_BLUE_TOKENS` / `POOL_STABLE_TOKENS`.
 
