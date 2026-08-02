@@ -47,16 +47,26 @@
 
 ## Курсы валют и индекс страха/жадности
 
-- Верхний блок дашборда разделён на 3 подблока: **Markets** (₿ BTC, Ξ ETH,
-  ₮ USDT→₽, индекс страха и жадности) | **All wallets** (сумма + изменения) | **donut**.
-- Источник курсов: **CoinGecko** (BTC/ETH в USD + USDT→RUB одним запросом,
-  без ключа). BestChange API публично недоступен (таймаут/геоблок), пары
-  USDT/RUB удалены на Binance/Bybit/OKX/KuCoin/MEXC/WhiteBIT.
+- Верхний блок дашборда — 3 подблока: **Markets** | **All wallets + donut** | **Portfolio history**.
+- **Markets**: ₿ BTC, Ξ ETH (в USD), ₮ USDT→₽, ₮ USDC→₽, $ USD→₽ / € EUR→₽ / £ GBP→₽
+  (официальные курсы ЦБ РФ), индекс страха и жадности.
+- Источник курсов: **CoinGecko** (BTC/ETH в USD + USDT/USDC→RUB, без ключа) +
+  **ЦБ РФ** (cbr-xml-daily.ru) для USD/EUR/GBP. BestChange API публично недоступен
+  (таймаут/геоблок), пары USDT/RUB удалены на Binance/Bybit/OKX/KuCoin/MEXC/WhiteBIT.
 - Fallback: BTC/ETH — Coinbase spot; USDT→₽ — MOEX USD/RUB (USDT≈USD).
 - F&G индекс: alternative.me. Кэш KV (`rates`), `/api/rates`.
 - **Нетто-донат:** DeFi показывается за вычетом долга (borrowed), поэтому
   сумма «All wallets» ВСЕГДА равна сумме сегментов доната. Долг — отдельной
   красной строкой («💳 Debt») в самари и в карточке кошелька.
+- **Portfolio history**: крон каждые 15 мин пишет точку стоимости в KV
+  (`/api/history`), верхний блок рисует график (1–7 дней).
+
+## Ручные активы (Russian Stocks)
+
+- В карточке «Russian Stocks» есть кнопка **➕ Add asset**: добавляй золото,
+  наличные, вклады и т.п. (символ, название, кол-во, цена в ₽).
+- Хранятся в KV (`manual`), API: `GET/POST/DELETE /api/manual`.
+- Считаются как позиции кошелька Russian Stocks (в рублях), попадают в donut.
 
 ## Горячие пулы — как обновляются
 

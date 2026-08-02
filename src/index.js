@@ -1,13 +1,16 @@
 import { WALLETS, STABLECOIN_SYMBOLS } from "./config.js";
 import { refreshRF, getRF, rfWalletSnapshot } from "./rf.js";
 import { getRates, refreshRates } from "./rates.js";
-import { DASHBOARD_HTML, DASHBOARD_JS } from "./dashboard.js";
+import { DASHBOARD_HTML, DASHBOARD_JS, DASHBOARD_JS2 } from "./dashboard.js";
 
 const KV_KEY = "snapshot";
 // Ключи KV для страницы «Горячие пулы» (готовые строки, рендерит скрипт sync-pools)
 const KV_POOLS_HTML = "poolsHtml";
 const KV_POOLS_JSON = "poolsJson";
 const KV_RATES = "defiRates"; // APR/TVL по протоколам (строит sync-pools.mjs из дампа DefiLlama)
+const KV_HISTORY = "history"; // временной ряд стоимости портфеля {t, total}[] (крон каждые 15 мин)
+const KV_MANUAL = "manual";    // ручные активы (Russian Stocks): [{id, symbol, name, units, priceRub}]
+const HISTORY_CAP = 4000;      // ~41 день по 96 точек/сутки — хватает на 30 дней
 
 // ---------- Zerion API ----------
 function zerionAuth(apiKey) {
@@ -161,7 +164,28 @@ async function refreshAll(env) {
   }
   const snapshot = { updatedAt: new Date().toISOString(), wallets };
   await env.DATA.put(KV_KEY, JSON.stringify(snapshot));
+  await saveHistoryPoint(env, wallets); // история стоимости — для графика (лёгкая KV-запись)
   return snapshot;
+}
+
+// Точка истории: суммарная стоимость портфеля (в USD, нетто). Каждые 15 мин
+// крон добавляет одну точку {t, total} в KV history — для графика в верхнем блоке.
+async function saveHistoryPoint(env, wallets) {
+  try {
+    let total = 0;
+    for (const w of wallets) {
+      if (!w.ok || !w.portfolio) continue;
+      total += w.portfolio.totalUsd || w.portfolio.total || 0;
+    }
+    const raw = await env.DATA.get(KV_HISTORY);
+    let hist = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(hist)) hist = [];
+    hist.push({ t: Date.now(), total: Math.round(total * 100) / 100 });
+    if (hist.length > HISTORY_CAP) hist = hist.slice(-HISTORY_CAP);
+    await env.DATA.put(KV_HISTORY, JSON.stringify(hist));
+  } catch (e) {
+    console.log("history:", e.message);
+  }
 }
 
 async function getSnapshot(env) {
@@ -279,6 +303,48 @@ export default {
           return json({ error: String(e.message || e), btcUsd: null, ethUsd: null, usdtRub: null, fng: null, fngLabel: null });
         }
       }
+      if (url.pathname === "/api/manual") {
+        if (request.method === "GET") {
+          const raw = await env.DATA.get(KV_MANUAL);
+          return json(raw ? JSON.parse(raw) : []);
+        }
+        if (request.method === "POST") {
+          const body = await request.json().catch(() => null);
+          if (!body || !body.symbol || body.units == null || body.priceRub == null) {
+            return json({ error: "нужны symbol, units, priceRub" }, { status: 400 });
+          }
+          const raw = await env.DATA.get(KV_MANUAL);
+          const list = raw ? JSON.parse(raw) : [];
+          const item = {
+            id: Math.random().toString(36).slice(2, 10),
+            symbol: String(body.symbol).toUpperCase(),
+            name: String(body.name || body.symbol),
+            units: Number(body.units),
+            priceRub: Number(body.priceRub),
+          };
+          list.push(item);
+          await env.DATA.put(KV_MANUAL, JSON.stringify(list));
+          return json({ ok: true, item });
+        }
+        if (request.method === "DELETE") {
+          const id = url.searchParams.get("id");
+          if (!id) return json({ error: "нет id" }, { status: 400 });
+          const raw = await env.DATA.get(KV_MANUAL);
+          const list = raw ? JSON.parse(raw) : [];
+          await env.DATA.put(KV_MANUAL, JSON.stringify(list.filter((x) => x.id !== id)));
+          return json({ ok: true });
+        }
+        return json({ error: "method" }, { status: 405 });
+      }
+      if (url.pathname === "/api/history") {
+        const raw = await env.DATA.get(KV_HISTORY);
+        if (!raw) return json([]);
+        const hist = JSON.parse(raw);
+        // Последние 700 точек (~7 дней) — график, без раздувания ответа
+        const days = Number(url.searchParams.get("days") || 7);
+        const perDay = 96; // 15-минутные точки
+        return json(hist.slice(-Math.min(hist.length, days * perDay)));
+      }
       if (url.pathname === "/api/rf") {
         const rf = await getRF(env);
         const cls = url.searchParams.get("class");
@@ -298,6 +364,13 @@ export default {
       if (url.pathname === "/dash.js") {
         // Клиентский JS дашборда отдельным файлом (оболочка+JS вместе больше лимита ответа)
         return new Response(DASHBOARD_JS, {
+          headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" },
+        });
+      }
+      if (url.pathname === "/dash2.js") {
+        // Доп. клиентский код (график истории + ручные активы) — чтобы /dash.js
+        // не превысил лимит ответа бесплатного тарифа (~19.5KB)
+        return new Response(DASHBOARD_JS2, {
           headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" },
         });
       }

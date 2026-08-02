@@ -14,6 +14,22 @@ const TTL_MS = 5 * 60 * 1000;
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; investsite/1.0)", Accept: "application/json" };
 
+// Официальные курсы ЦБ РФ (cbr-xml-daily.ru — зеркало ЦБ, без ключа)
+async function fetchCbr() {
+  const r = await fetchRetry("https://www.cbr-xml-daily.ru/daily_json.js");
+  if (!r) return { usdRub: null, eurRub: null, gbpRub: null };
+  try {
+    const j = await r.json();
+    const val = (code) => {
+      const v = j.Valute && j.Valute[code];
+      return v && v.Value != null ? Number(v.Value) : null;
+    };
+    return { usdRub: val("USD"), eurRub: val("EUR"), gbpRub: val("GBP") };
+  } catch (e) {
+    return { usdRub: null, eurRub: null, gbpRub: null };
+  }
+}
+
 // fetch с ретраями на 429/5xx (CoinGecko любит рейт-лимитить)
 async function fetchRetry(url, tries = 3) {
   for (let i = 0; i < tries; i++) {
@@ -24,16 +40,17 @@ async function fetchRetry(url, tries = 3) {
   return null;
 }
 
-// BTC/ETH в USD: CoinGecko, при неудаче — Coinbase spot
+// BTC/ETH в USD + USDT/USDC→₽: CoinGecko, при неудаче — Coinbase spot / MOEX USD/RUB
 async function fetchPx() {
-  const cg = await fetchRetry("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether&vs_currencies=usd,rub");
-  let btcUsd = null, ethUsd = null, usdtRub = null;
+  const cg = await fetchRetry("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether,usd-coin&vs_currencies=usd,rub");
+  let btcUsd = null, ethUsd = null, usdtRub = null, usdcRub = null;
   if (cg) {
     try {
       const j = await cg.json();
       btcUsd = j.bitcoin?.usd ?? null;
       ethUsd = j.ethereum?.usd ?? null;
       usdtRub = j.tether?.rub ?? null;
+      usdcRub = j["usd-coin"]?.rub ?? null;
     } catch (e) {}
   }
   if (btcUsd == null || ethUsd == null) {
@@ -46,30 +63,38 @@ async function fetchPx() {
       try { const j = await ce.json(); if (j.data?.amount) ethUsd = Number(j.data.amount); } catch (e) {}
     }
   }
-  // USDT→RUB: если CoinGecko не дал — берём USD/RUB с MOEX (USDT≈USD)
-  if (usdtRub == null) {
+  // USDT/USDC→RUB: если CoinGecko не дал — берём USD/RUB с MOEX (USDT≈USD)
+  if (usdtRub == null || usdcRub == null) {
     const moex = await fetchRetry("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/USD000UTSTOM.json?iss.meta=off&iss.only=marketdata&marketdata.columns=SECID,LAST");
     if (moex) {
       try {
         const j = await moex.json();
         const last = j.marketdata?.data?.[0]?.[1];
-        if (last != null) usdtRub = Number(last);
+        if (last != null) {
+          if (usdtRub == null) usdtRub = Number(last);
+          if (usdcRub == null) usdcRub = Number(last);
+        }
       } catch (e) {}
     }
   }
-  return { btcUsd, ethUsd, usdtRub };
+  return { btcUsd, ethUsd, usdtRub, usdcRub };
 }
 
 export async function fetchRates() {
-  const [px, fng] = await Promise.all([
+  const [px, cbr, fng] = await Promise.all([
     fetchPx(),
+    fetchCbr(),
     fetchRetry("https://api.alternative.me/fng/?limit=1"),
   ]);
   const d = fng ? ((await fng.json().catch(() => ({})))?.data?.[0]) : null;
   return {
     btcUsd: px.btcUsd ?? null,
     ethUsd: px.ethUsd ?? null,
-    usdtRub: px.usdtRub ?? null, // курс USDT → ₽ (для левого блока и РФ-конвертации)
+    usdtRub: px.usdtRub ?? null, // USDT → ₽ (для левого блока и РФ-конвертации)
+    usdcRub: px.usdcRub ?? null, // USDC → ₽
+    usdRub: cbr.usdRub ?? null,  // официальный курс ЦБ
+    eurRub: cbr.eurRub ?? null,
+    gbpRub: cbr.gbpRub ?? null,
     fng: d ? Number(d.value) : null,
     fngLabel: d ? d.value_classification : null,
     updatedAt: new Date().toISOString(),

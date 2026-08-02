@@ -157,6 +157,31 @@ export async function rfWalletSnapshot(env) {
       pool: null,
     });
   });
+  // Ручные активы (KV manual): золото, наличные, вклады — как позиции Russian Stocks
+  try {
+    const raw = await env.DATA.get("manual");
+    const manual = raw ? JSON.parse(raw) : [];
+    for (const m of manual) {
+      const valueRub = (Number(m.units) || 0) * (Number(m.priceRub) || 0);
+      totalRub += valueRub;
+      positions.push({
+        value: valueRub,
+        valueUsd: valueRub / rate,
+        symbol: String(m.symbol || "?"),
+        name: String(m.name || m.symbol || "?"),
+        icon: "",
+        chain: "manual",
+        type: "wallet",
+        cat: "crypto", // ручные активы — не стейблы (может быть золото/вклад)
+        protocol: "Manual",
+        amount: Number(m.units) || null,
+        manualId: m.id,
+        pool: null,
+      });
+    }
+  } catch (e) {
+    console.log("manual:", e.message);
+  }
   const totalUsd = totalRub / rate;
   return {
     id: RF_WALLET.id,

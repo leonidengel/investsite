@@ -31,6 +31,9 @@ export const DASHBOARD_HTML = `<!doctype html>
              animation:spin .8s linear infinite; margin:40px auto; }
   @keyframes spin { to { transform:rotate(360deg); } }
   .loading-txt { color:#8b93a7; font-size:13px; text-align:center; margin-top:-20px; padding-bottom:40px; }
+  .manual-form { margin-top:8px; display:grid; gap:6px; }
+  .manual-form.hidden { display:none; }
+  .mf { border:1px solid #e4e8f0; border-radius:8px; padding:6px 10px; font-size:12px; font-family:inherit; }
   .stats { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:#66718a; }
   .stat b { color:#1b2433; }
   .stat.debt b { color:#dc2626; }
@@ -119,6 +122,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   <div class="cards" id="cards"><div class="spinner"></div><div class="loading-txt">Loading portfolios…</div></div>
 </div>
 <script src="/dash.js"></script>
+<script src="/dash2.js"></script>
 </body></html>`;
 
 export const DASHBOARD_JS = `
@@ -153,24 +157,9 @@ function fmtMoney(v) {
 }
 
 function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function fngColor(v) {
-  if (v == null) return "#8b93a7";
-  if (v < 25) return "#dc2626";
-  if (v < 45) return "#f97316";
-  if (v < 55) return "#d97706";
-  if (v < 75) return "#84cc16";
-  return "#0e9f6e";
-}
-function ratesHtml(r) {
-  var rows = "";
-  if (r && r.btcUsd) rows += '<div class="rate"><span>₿ Bitcoin</span><b>' + fmtUSD(r.btcUsd) + "</b></div>";
-  if (r && r.ethUsd) rows += '<div class="rate"><span>Ξ Ethereum</span><b>' + fmtUSD(r.ethUsd) + "</b></div>";
-  if (r && r.usdtRub) rows += '<div class="rate"><span>₮ USDT → ₽</span><b>' + fmtRUB(r.usdtRub) + "</b></div>";
-  var fng = (r && r.fng != null)
-    ? '<div class="fng"><span class="fng-dot" style="background:' + fngColor(r.fng) + '"></span><b>' + r.fng + "</b> " + esc(r.fngLabel) + "</div>"
-    : "";
-  return '<div class="comb-col"><h3 class="sec">Markets</h3>' + rows + fng + "</div>";
-}
+// ratesHtml/fngColor определены в DASHBOARD_JS2 (файл /dash2.js, грузится сразу
+// после /dash.js в <head>) — к моменту render() после fetch они уже доступны.
+function histHtml() { return '<div class="muted">loading…</div>'; } // перерисует DASHBOARD_JS2
 // «обновлено X мин назад» (относительное время)
 function timeAgo(iso) {
   var ms = Date.now() - new Date(iso).getTime();
@@ -203,31 +192,6 @@ function chgHtml(change) {
   if (change === undefined || change === null) return "";
   var up = change >= 0;
   return '<span class="chg ' + (up ? "up" : "down") + '">' + (up ? "▲" : "▼") + " " + Math.abs(change).toFixed(2) + "% in 24h</span>";
-}
-function donut(entries, size, thickness) {
-  var total = entries.reduce(function(s,e){ return s + e.value; }, 0);
-  if (!total || !entries.length) return "";
-  var r = (size - thickness) / 2, c = 2 * Math.PI * r, cx = size/2, cy = size/2, offset = 0, segs = "";
-  for (var i = 0; i < entries.length; i++) {
-    var e = entries[i], frac = e.value / total, dash = frac * c;
-    segs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + e.color + '" stroke-width="' + thickness + '" stroke-dasharray="' + dash + " " + (c - dash) + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 ' + cx + " " + cy + ')"/>';
-    offset += dash;
-  }
-  var center = total >= 1000 ? "$" + Math.round(total).toLocaleString("en-US") : "$" + total.toFixed(2);
-  return '<svg viewBox="0 0 ' + size + " " + size + '" width="' + size + '" height="' + size + '" style="flex-shrink:0">' +
-    '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#eef1f6" stroke-width="' + thickness + '"/>' +
-    segs +
-    '<text x="' + cx + '" y="' + (cy - 3) + '" text-anchor="middle" fill="#1b2433" font-size="17" font-weight="700">' + center + "</text>" +
-    '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" fill="#8b93a7" font-size="12">total</text></svg>';
-}
-function legend(entries) {
-  var total = entries.reduce(function(s,e){ return s + e.value; }, 0) || 1;
-  return entries.map(function(e){
-    return '<div class="li"><span class="dot" style="background:' + e.color + '"></span>' +
-      '<span class="lname">' + esc(e.label) + '</span>' +
-      '<span class="lpct">' + fmtPct(e.value / total * 100) + '</span>' +
-      '<span class="lval">' + fmtUSD(e.value) + "</span></div>";
-  }).join("");
 }
 function combined(snap) {
   // Нетто-донат: DeFi показываем за вычетом долга (borrowed), чтобы верхняя
@@ -419,8 +383,9 @@ function render(snap) {
       '<div class="comb-cols">' +
       ratesHtml(MARKETS) +
       '<div class="comb-col"><div class="total-row"><span class="total big">' + fmtUSD(c.total) + "</span> " + chgHtml(c.change) + "</div>" +
-      defiRow(c.cats) + "</div>" +
-      '<div class="comb-col"><div class="chart-wrap">' + donut(c.top, 230, 30) + '<div class="legend">' + legend(c.top) + "</div></div></div>" +
+      defiRow(c.cats) +
+      '<div class="chart-wrap">' + donut(c.top, 210, 28) + '<div class="legend">' + legend(c.top) + "</div></div></div>" +
+      '<div class="comb-col" id="histCol"><h3 class="sec">Portfolio history</h3><div id="histChart"></div></div>' +
       "</div></div>";
   }
   snap.wallets.forEach(function(w, i){ html += walletCard(w, i); });
@@ -465,4 +430,157 @@ Promise.all([
   document.getElementById("cards").innerHTML = '<div class="loading">Load error: ' + esc(e.message) + "</div>";
 });
 setInterval(function(){ if (LAST_UPDATED) setUpdated(LAST_UPDATED); }, 30000);
+`;
+
+
+// ================= DASHBOARD_JS2 (график истории + ручные активы) =================
+// Подключается отдельно: /dash2.js. Использует глобалы из /dash.js (esc, fmtUSD,
+// fmtRUB, timeAgo). Всё запускается после render() из /dash.js — поэтому слушаем
+// загрузку DOM и данные тянутся независимо.
+export const DASHBOARD_JS2 = `
+// ===== функции блока Markets (курсы) — переехали сюда из /dash.js, чтобы он
+// не превышал лимит ответа; вызываются из render() (после fetch — /dash2.js уже загружен)
+function fngColor(v) {
+  if (v == null) return "#8b93a7";
+  if (v < 25) return "#dc2626";
+  if (v < 45) return "#f97316";
+  if (v < 55) return "#d97706";
+  if (v < 75) return "#84cc16";
+  return "#0e9f6e";
+}
+function ratesHtml(r) {
+  var rows = "", c = function (lbl, v, f) { return v ? '<div class="rate"><span>' + lbl + "</span><b>" + f(v) + "</b></div>" : ""; };
+  rows += c("₿ Bitcoin", r.btcUsd, fmtUSD) + c("Ξ Ethereum", r.ethUsd, fmtUSD);
+  rows += c("₮ USDT→₽", r.usdtRub, fmtRUB) + c("₮ USDC→₽", r.usdcRub, fmtRUB);
+  rows += c("$ USD (CBR)", r.usdRub, fmtRUB) + c("€ EUR (CBR)", r.eurRub, fmtRUB) + c("£ GBP (CBR)", r.gbpRub, fmtRUB);
+  var fng = (r && r.fng != null)
+    ? '<div class="fng"><span class="fng-dot" style="background:' + fngColor(r.fng) + '"></span><b>' + r.fng + "</b> " + esc(r.fngLabel) + "</div>"
+    : "";
+  return '<div class="comb-col"><h3 class="sec">Markets</h3>' + rows + fng + "</div>";
+}
+// --- Донат и легенда (переехали из /dash.js — вызываются из render после fetch) ---
+function donut(entries, size, thickness) {
+  var total = entries.reduce(function(s,e){ return s + e.value; }, 0);
+  if (!total || !entries.length) return "";
+  var r = (size - thickness) / 2, c = 2 * Math.PI * r, cx = size/2, cy = size/2, offset = 0, segs = "";
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i], frac = e.value / total, dash = frac * c;
+    segs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + e.color + '" stroke-width="' + thickness + '" stroke-dasharray="' + dash + " " + (c - dash) + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 ' + cx + " " + cy + ')"/>';
+    offset += dash;
+  }
+  var center = total >= 1000 ? "$" + Math.round(total).toLocaleString("en-US") : "$" + total.toFixed(2);
+  return '<svg viewBox="0 0 ' + size + " " + size + '" width="' + size + '" height="' + size + '" style="flex-shrink:0">' +
+    '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#eef1f6" stroke-width="' + thickness + '"/>' +
+    segs +
+    '<text x="' + cx + '" y="' + (cy - 3) + '" text-anchor="middle" fill="#1b2433" font-size="17" font-weight="700">' + center + "</text>" +
+    '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" fill="#8b93a7" font-size="12">total</text></svg>';
+}
+function legend(entries) {
+  var total = entries.reduce(function(s,e){ return s + e.value; }, 0) || 1;
+  return entries.map(function(e){
+    return '<div class="li"><span class="dot" style="background:' + e.color + '"></span>' +
+      '<span class="lname">' + esc(e.label) + '</span>' +
+      '<span class="lpct">' + fmtPct(e.value / total * 100) + '</span>' +
+      '<span class="lval">' + fmtUSD(e.value) + "</span></div>";
+  }).join("");
+}
+// --- График истории стоимости портфеля ---
+function histHtml() {
+  var el = document.getElementById("histChart");
+  if (!el) return;
+  fetch("/api/history")
+    .then(function (r) { return r.json(); })
+    .then(function (hist) {
+      if (!hist || hist.length < 2) { el.innerHTML = '<div class="muted">no history yet</div>'; return; }
+      el.innerHTML = spark(hist);
+    })
+    .catch(function () { el.innerHTML = '<div class="muted">history unavailable</div>'; });
+}
+function spark(hist) {
+  var W = 260, H = 110, P = 6;
+  var vals = hist.map(function (p) { return p.total; });
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  var span = max - min || 1;
+  var x = function (i) { return P + (W - 2 * P) * i / (vals.length - 1); };
+  var y = function (v) { return H - P - (H - 2 * P) * (v - min) / span; };
+  var pts = vals.map(function (v, i) { return x(i).toFixed(1) + "," + y(v).toFixed(1); });
+  var last = vals[vals.length - 1];
+  var first = vals[0];
+  var chg = ((last - first) / first * 100).toFixed(1);
+  var up = last >= first;
+  var fill = 'M' + x(0).toFixed(1) + "," + (H - P) + " L" + pts.join(" L") + " L" + x(vals.length - 1).toFixed(1) + "," + (H - P) + " Z";
+  var startT = hist[0].t, endT = hist[hist.length - 1].t;
+  var days = ((endT - startT) / 86400000).toFixed(0);
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" style="display:block">' +
+    '<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="' + (up ? "#3ddc84" : "#ff7a9c") + '" stop-opacity=".35"/>' +
+    '<stop offset="1" stop-color="' + (up ? "#3ddc84" : "#ff7a9c") + '" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + fill + '" fill="url(#hg)"/>' +
+    '<polyline points="' + pts.join(" ") + '" fill="none" stroke="' + (up ? "#0e9f6e" : "#dc2626") + '" stroke-width="2" stroke-linejoin="round"/>' +
+    '</svg>' +
+    '<div class="rate" style="margin-top:6px"><span>' + days + ' days · ' + fmtUSD(first) + ' → ' + fmtUSD(last) + '</span>' +
+    '<b style="color:' + (up ? "#0e9f6e" : "#dc2626") + '">' + (up ? "▲" : "▼") + " " + chg + "%</b></div>";
+}
+
+// --- Ручные активы (Russian Stocks) ---
+function manualHtml() {
+  var cards = document.querySelectorAll(".card");
+  var rs = null;
+  cards.forEach(function (c) {
+    if (c.querySelector(".head b") && c.querySelector(".head b").textContent === "Russian Stocks") rs = c;
+  });
+  if (!rs) return;
+  var sec = rs.querySelector(".sec");
+  if (!sec) return;
+  // кнопка «+ Add asset» под заголовком Assets
+  var btn = document.createElement("button");
+  btn.className = "src";
+  btn.textContent = "➕ Add asset";
+  btn.style.marginTop = "8px";
+  btn.onclick = function () { form.classList.toggle("hidden"); };
+  sec.parentNode.insertBefore(btn, sec.nextSibling);
+  // форма: symbol, name, units, price ₽
+  var form = document.createElement("div");
+  form.className = "manual-form hidden";
+  form.innerHTML = '<input class="mf" placeholder="Symbol (e.g. GOLD)" id="mfSym">' +
+    '<input class="mf" placeholder="Name (optional)" id="mfName">' +
+    '<input class="mf" type="number" placeholder="Units" id="mfUnits">' +
+    '<input class="mf" type="number" placeholder="Price ₽" id="mfPrice">' +
+    '<button class="src" id="mfSave">Save</button>' +
+    '<div class="muted" id="mfMsg"></div>';
+  btn.parentNode.insertBefore(form, btn.nextSibling);
+  document.getElementById("mfSave").onclick = function () {
+    var body = {
+      symbol: document.getElementById("mfSym").value,
+      name: document.getElementById("mfName").value,
+      units: parseFloat(document.getElementById("mfUnits").value),
+      priceRub: parseFloat(document.getElementById("mfPrice").value),
+    };
+    if (!body.symbol || !(body.units > 0) || !(body.priceRub > 0)) {
+      document.getElementById("mfMsg").textContent = "fill symbol, units and price";
+      return;
+    }
+    fetch("/api/manual", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.ok) location.reload();
+      else document.getElementById("mfMsg").textContent = "error: " + (j.error || "?");
+    });
+  };
+}
+
+// Контейнеры (история, карточка Russian Stocks) создаёт render() из /dash.js
+// ПОСЛЕ fetch /api/data — поэтому ждём их появления поллингом (раз в 300мс).
+function startDash2() {
+  var n = 0, histDone = false, manDone = false;
+  var iv = setInterval(function () {
+    n++;
+    if (!histDone && document.getElementById("histChart")) { histHtml(); histDone = true; }
+    if (!manDone && document.querySelector("#cards .card")) { manualHtml(); manDone = true; }
+    if ((histDone && manDone) || n > 30) clearInterval(iv);
+  }, 300);
+}
+startDash2();
 `;

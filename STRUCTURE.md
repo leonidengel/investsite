@@ -19,8 +19,9 @@ portfolio.engels/
 ├── src/
 │   ├── index.js                 ← Worker: Zerion API, крон, маршруты
 │   │                              (/, /pools, /api/*) — тонкий, без рендера
-│   ├── dashboard.js             ← статичная HTML-оболочка дашборда; браузер
-│   │                              сам тянет /api/data и рисует donut+карточки
+│   ├── dashboard.js             ← HTML-оболочка + /dash.js + /dash2.js (график
+│   │                              истории, ручные активы, курсы); браузер сам
+│   │                              тянет /api/data, /api/rates, /api/history
 │   ├── config.js                ← WALLETS (Rabby/Tangem + Russian Stocks),
 │   │                              RF_WATCHLIST (8 бумаг), POOL_BLUE/STABLE
 │   │                              TOKENS, карта сетей DefiLlama, палитра
@@ -48,11 +49,13 @@ portfolio.engels/
 
 - **Два независимых worker'а** (`portfolio` и `lp`) — свои `wrangler.toml`,
   деплоятся отдельно.
-- **Бесплатный тариф Workers = 10мс CPU/запрос.** Поэтому:
-  - дашборд рендерится в браузере (статичная оболочка + `/api/data`);
+- **Бесплатный тариф Workers = 10мс CPU/запрос + лимит ответа ~18.9KB.**
+  Поэтому:
+  - дашборд рендерится в браузере: HTML-оболочка + `/dash.js` + `/dash2.js`
+    (клиентский код разбит на 2 файла, чтобы каждый был меньше лимита);
   - пулы рендерит внешний скрипт (`sync-pools.mjs`), worker отдаёт из KV
-    оболочку `/pools` (без данных) + `/api/pools?cat=` по категориям
-    (150 пулов целиком не проходят лимит — чанкинг);
+    оболочку `/pools` (без данных) + `/api/pools?cat=` по категориям;
+  - история портфеля — крон пишет точку в KV каждые 15 мин, `/api/history`;
   - РФ — маленький watchlist, крон справляется сам.
 - **Кэш/служебное** (`.wrangler/`, `.sync-out/`, `.DS_Store`) — не в Git
   (см. `.gitignore`).

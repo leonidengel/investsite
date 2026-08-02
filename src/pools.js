@@ -186,6 +186,13 @@ export function renderPoolsPage(data, subdomain) {
   .muted { color:#8b93a7; }
   .apy-val { font-weight:700; }
   .note { color:#8b93a7; font-size:11px; margin-top:12px; }
+  .modal-bg { position:fixed; inset:0; background:rgba(16,24,40,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .modal { background:#fff; border-radius:14px; max-width:640px; width:100%; max-height:85vh; overflow:auto; padding:18px; box-shadow:0 10px 30px rgba(16,24,40,.2); }
+  .modal-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+  .modal-head b { font-size:17px; }
+  .modal-close { margin-left:auto; border:1px solid #e4e8f0; background:#fff; border-radius:8px; width:30px; height:30px; cursor:pointer; color:#66718a; font-size:15px; }
+  .modal-stats { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:#66718a; margin:8px 0 12px; }
+  .modal-stats b { color:#1b2433; }
   .spinner { width:28px; height:28px; border:3px solid #dbe3f7; border-top-color:#3b6ef5; border-radius:50%;
              animation:spin .8s linear infinite; margin:24px auto; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -273,6 +280,7 @@ function prep(list) {
     apy: p.a,
     vol: p.v,
     m: p.m,
+    id: p.id,
   }));
 }
 
@@ -311,7 +319,9 @@ function render() {
         ? '<span class="muted">—</span><div class="sub-lbl">cur. ' + cur + '</div>'
         : '<span class="apy-val">' + v.toFixed(1) + '%</span><div class="sub-lbl">cur. ' + cur + '</div>';
       const vol = p.vol != null ? fmtMoney(p.vol) : '<span class="muted">—</span>';
-      return '<tr><td class="rank">' + (i + 1) + "</td>" +
+      var q = function (v) { return JSON.stringify(v).replace(/"/g, "&quot;"); };
+      return '<tr style="cursor:pointer" onclick="openPool(' + q(p.s) + ',' + q(p.id) + ',' + q(p.cn) + ',' + q(p.pr) + ',' + p.tvl + ',' + p.apy + ')">' +
+        '<td class="rank">' + (i + 1) + "</td>" +
         '<td><div class="pool"><img src="' + p.ic + '" alt="" loading="lazy" onerror="this.remove()">' +
         "<b>" + p.s + "</b></div></td>" +
         '<td class="muted">' + p.cn + "</td>" +
@@ -322,6 +332,65 @@ function render() {
     })
     .join("");
 }
+
+// --- Детали пула: модалка с графиком APY (данные DefiLlama chart, CORS разрешён) ---
+var CHART_CACHE = {};
+function openPool(sym, id, chain, proto, tvl, apy) {
+  var bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.innerHTML = '<div class="modal"><div class="modal-head"><b>' + esc(sym) + '</b>' +
+    '<span class="sub-lbl">' + esc(chain) + " · " + esc(proto) + "</span>" +
+    '<button class="modal-close">✕</button></div>' +
+    '<div class="modal-stats"><span>TVL <b>' + fmtMoney(tvl) + '</b></span>' +
+    '<span>APY <b>' + (apy != null ? apy.toFixed(1) + "%" : "—") + "</b></span>" +
+    '<span id="mVol">24h Vol <b>—</b></span></div>' +
+    '<div id="mChart"><div class="spinner"></div></div></div>';
+  bg.onclick = function (e) { if (e.target === bg) bg.remove(); };
+  bg.querySelector(".modal-close").onclick = function () { bg.remove(); };
+  document.body.appendChild(bg);
+  // объём из данных категории
+  var pool = null;
+  [DATA.blueChip, DATA.stableCoin, DATA.fix].forEach(function (l) {
+    l.forEach(function (p) { if (p.id === id) pool = p; });
+  });
+  if (pool && pool.vol != null) bg.querySelector("#mVol").innerHTML = "24h Vol <b>" + fmtMoney(pool.vol) + "</b>";
+  // график APY: тянем chart напрямую (yields.llama.fi, CORS *)
+  if (CHART_CACHE[id]) drawChart(bg, id, CHART_CACHE[id]);
+  else
+    fetch("https://yields.llama.fi/chart/" + id)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var pts = (j.data || []).filter(function (p) { return p.apy != null; });
+        CHART_CACHE[id] = pts;
+        drawChart(bg, id, pts);
+      })
+      .catch(function () {
+        bg.querySelector("#mChart").innerHTML = '<div class="muted">chart unavailable</div>';
+      });
+}
+function drawChart(bg, id, pts) {
+  var el = bg.querySelector("#mChart");
+  if (!el) return;
+  if (!pts.length) { el.innerHTML = '<div class="muted">no APY data</div>'; return; }
+  var W = 560, H = 200, P = 8;
+  var vals = pts.map(function (p) { return p.apy; });
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  var span = max - min || 1;
+  var x = function (i) { return P + (W - 2 * P) * i / (pts.length - 1); };
+  var y = function (v) { return H - P - (H - 2 * P) * (v - min) / span; };
+  var line = pts.map(function (p, i) { return x(i).toFixed(1) + "," + y(p.apy).toFixed(1); }).join(" ");
+  var fill = "M" + x(0).toFixed(1) + "," + (H - P) + " L" + pts.map(function (p, i) { return x(i).toFixed(1) + "," + y(p.apy).toFixed(1); }).join(" L") + " L" + x(pts.length - 1).toFixed(1) + "," + (H - P) + " Z";
+  var last = pts[pts.length - 1].apy;
+  el.innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" style="display:block">' +
+    '<defs><linearGradient id="mg" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#3b6ef5" stop-opacity=".3"/><stop offset="1" stop-color="#3b6ef5" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + fill + '" fill="url(#mg)"/>' +
+    '<polyline points="' + line + '" fill="none" stroke="#3b6ef5" stroke-width="2"/>' +
+    '<text x="' + (W - P) + '" y="' + (P + 12) + '" text-anchor="end" fill="#1b2433" font-size="12" font-weight="600">' + last.toFixed(1) + "% APY</text>" +
+    "</svg>" +
+    '<div class="note">APY history (daily, DefiLlama). Click outside to close.</div>';
+}
+function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
 // Данные грузим отдельными запросами: 150 пулов + JS вместе не проходят лимит
 // ответа, поэтому тянем индекс + каждую категорию по отдельности (~10KB каждая).
