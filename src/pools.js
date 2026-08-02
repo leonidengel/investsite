@@ -149,6 +149,7 @@ export function renderPoolsPage(data, subdomain) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%2223%22%20y%3D%225%22%20width%3D%2218%22%20height%3D%229%22%20rx%3D%223%22%20fill%3D%22%23d97706%22%2F%3E%3Cpath%20d%3D%22M23%209h18%22%20stroke%3D%22%2392400e%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M19%2014h26c3.5%207%206%2013.5%206%2019.5C51%2044%2043%2052%2032%2052S13%2044%2013%2033.5c0-6%202.5-12.5%206-19.5z%22%20fill%3D%22%23f59e0b%22%2F%3E%3Cpath%20d%3D%22M13%2033.5C13%2044%2021%2052%2032%2052c6%200%2011-2%2015-5-3-5-9-8-16-8-4%200-8%201-12%203.5z%22%20fill%3D%22%23d97706%22%2F%3E%3Ctext%20x%3D%2232%22%20y%3D%2242%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2221%22%20font-weight%3D%22700%22%20fill%3D%22%237c2d12%22%20text-anchor%3D%22middle%22%3E%24%3C%2Ftext%3E%3C%2Fsvg%3E">
 <title>Invest Portfolio — Hot Pools</title>
 <style>
   :root { color-scheme: light; }
