@@ -74,8 +74,8 @@ async function main() {
 
   console.log("[sync-pools] классификация по watchlist + средние APY (чарты)…");
   const data = await buildPoolsData(dump);
-  console.log(`[sync-pools] blue-chip: ${data.blueChip.length}, stable: ${data.stableCoin.length}`);
-  if (!data.blueChip.length && !data.stableCoin.length) throw new Error("не нашлось пулов по watchlist");
+  console.log(`[sync-pools] blue-chip: ${data.blueChip.length}, stable: ${data.stableCoin.length}, fix: ${data.fix.length}`);
+  if (!data.blueChip.length && !data.stableCoin.length && !data.fix.length) throw new Error("не нашлось пулов по watchlist");
 
   const html = renderPoolsPage(data, SUBDOMAIN);
   const json = renderApiJson(data);

@@ -30,24 +30,27 @@ function toks(p) {
 }
 
 // ---------- Классификация по watchlist ----------
-// Только LP-пары: ровно 2 монеты (одиночные стейкинг/лендинг-пулы отсекаем).
-// blue-chip: оба токена из watchlist, есть хотя бы один blue-chip, не чистый стейбл
-// stable: оба токена — стейблкоины из watchlist
+// blue-chip/stable: только LP-пары (ровно 2 разные монеты).
+// fix: одиночные монеты — лендинг/стейкинг (одна монета из watchlist).
 export function classifyPools(data) {
   const blue = [];
   const stable = [];
+  const fix = [];
   for (const p of data) {
     if (p.outlier === true || (p.tvlUsd || 0) < MIN_TVL || (p.apy || 0) <= 0) continue;
     const t = toks(p);
-    if (t.length !== 2 || t[0] === t[1]) continue; // LP-пул = 2 разные монеты
-    const hasBlue = t.some((x) => BLUE.has(x));
-    const allWatch = t.every((x) => BLUE.has(x) || STABLE.has(x));
-    const pureStable = t.every((x) => STABLE.has(x));
-    if (allWatch && hasBlue && !pureStable) blue.push(p);
-    else if (pureStable) stable.push(p);
+    if (t.length === 2 && t[0] !== t[1]) {
+      const hasBlue = t.some((x) => BLUE.has(x));
+      const allWatch = t.every((x) => BLUE.has(x) || STABLE.has(x));
+      const pureStable = t.every((x) => STABLE.has(x));
+      if (allWatch && hasBlue && !pureStable) blue.push(p);
+      else if (pureStable) stable.push(p);
+    } else if (t.length === 1 && (BLUE.has(t[0]) || STABLE.has(t[0]))) {
+      fix.push(p); // лендинг/стейкинг одной монеты
+    }
   }
   const top = (l) => l.sort((a, b) => (b.apy || 0) - (a.apy || 0)).slice(0, TOP_N);
-  return { blueChip: top(blue), stableCoin: top(stable) };
+  return { blueChip: top(blue), stableCoin: top(stable), fix: top(fix) };
 }
 
 // fee-APR в стиле Krystal: годовая доходность от комиссий пула
@@ -72,6 +75,7 @@ export function compact(p) {
     t: Math.round(p.tvlUsd || 0),
     a: +(p.apy || 0).toFixed(2),
     v: p.volumeUsd1d ? Math.round(p.volumeUsd1d) : null,
+    cn: poolChainName(p.chain),
     a1: feeApr(p.volumeUsd1d, p.tvlUsd, fee, 1), // 24h fee-APR
     a7: feeApr(p.volumeUsd7d, p.tvlUsd, fee, 7), // 7d fee-APR
   };
@@ -116,7 +120,7 @@ export async function fetchChartMeans(poolId) {
 
 // Полная сборка: классификация → компакт → средние по каждому пулу
 export async function buildPoolsData(dumpData, { withMeans = true, sleepMs = 150 } = {}) {
-  const { blueChip, stableCoin } = classifyPools(dumpData);
+  const { blueChip, stableCoin, fix } = classifyPools(dumpData);
   const attach = async (list) => {
     const out = [];
     for (const p of list) {
@@ -133,27 +137,15 @@ export async function buildPoolsData(dumpData, { withMeans = true, sleepMs = 150
     updatedAt: new Date().toISOString(),
     blueChip: await attach(blueChip),
     stableCoin: await attach(stableCoin),
+    fix: await attach(fix),
   };
 }
 
 // ---------- Рендер страницы /pools (HTML) ----------
-// data: { updatedAt, blueChip: [...], stableCoin: [...] } — каждый пул с полем m (means)
+// Страница — лёгкая оболочка БЕЗ данных: сами пулы браузер тянет из /api/pools.
+// (Оболочка + JS + 90 пулов вместе превышают лимит ответа бесплатного тарифа
+// ~19.5KB — тот же приём, что с дашбордом на /dash.js.)
 export function renderPoolsPage(data, subdomain) {
-  const prep = (list) =>
-    list.map((p) => ({
-      s: p.s,
-      cn: poolChainName(p.c),
-      pr: p.pr,
-      ic: `https://icons.llamao.fi/icons/protocols/${encodeURIComponent(p.pr)}?style=square`,
-      tvl: p.t,
-      apy: p.a,
-      vol: p.v,
-      a1: p.a1,
-      a7: p.a7,
-      m: p.m,
-    }));
-  const payload = JSON.stringify({ updatedAt: data.updatedAt, blueChip: prep(data.blueChip), stableCoin: prep(data.stableCoin) }).replace(/</g, "\\u003c");
-
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -209,6 +201,7 @@ export function renderPoolsPage(data, subdomain) {
     <div class="tabs">
       <button class="tab active" data-tab="blueChip">Best Blue-chip Pools</button>
       <button class="tab" data-tab="stableCoin">Best Stable Coin Pools</button>
+      <button class="tab" data-tab="fix">Fix</button>
     </div>
     <div class="periods" id="periods"></div>
   </div>
@@ -221,16 +214,17 @@ export function renderPoolsPage(data, subdomain) {
       <tbody id="rows"><tr><td colspan="7"><div class="spinner"></div></td></tr></tbody>
     </table>
   </div></div>
-  <div class="note">Pairs of major tokens (watchlist), junk pools filtered out (TVL ≥ $0.5M, not outlier). Window APY is the pool's average APY from DefiLlama history; "—" when not enough history.</div>
+  <div class="note">Blue-chip/Stable — LP pairs of major tokens (watchlist). Fix — single-coin lending/staking. Junk filtered out (TVL ≥ $0.5M, not outlier). Window APY is the pool's average APY from DefiLlama history; "—" when not enough history.</div>
 </div>
 <script>
-const DATA = ${payload};
 const PERIODS = [7, 30, 60, 90, 120, 180];
 const PERIOD_LABELS = ["24h", ...PERIODS.map((d) => d + "d")];
 let tab = "blueChip";
 let period = "24h";
+let DATA = null;
 // relative "updated X min ago" + auto-refresh
 function timeAgo(iso) {
+  if (!iso) return "—";
   var ms = Date.now() - new Date(iso).getTime();
   var min = Math.floor(ms / 60000);
   if (min < 1) return "just now";
@@ -243,8 +237,6 @@ function setUpdated(iso) {
   var el = document.getElementById("upd");
   if (el) el.textContent = timeAgo(iso);
 }
-setUpdated(DATA.updatedAt);
-setInterval(function(){ setUpdated(DATA.updatedAt); }, 30000);
 
 const periodsEl = document.getElementById("periods");
 PERIOD_LABELS.forEach((lbl, i) => {
@@ -269,6 +261,20 @@ document.querySelectorAll(".tab").forEach((b) => {
   };
 });
 
+// prep: добавляем иконку протокола (имя сети cn уже приходит из /api/pools)
+function prep(list) {
+  return (list || []).map((p) => ({
+    s: p.s,
+    cn: p.cn,
+    pr: p.pr,
+    ic: "https://icons.llamao.fi/icons/protocols/" + encodeURIComponent(p.pr) + "?style=square",
+    tvl: p.t,
+    apy: p.a,
+    vol: p.v,
+    m: p.m,
+  }));
+}
+
 function valOf(p) {
   if (period === "24h") return p.apy;
   const idx = PERIODS.indexOf(period);
@@ -285,7 +291,8 @@ function fmtMoney(v) {
 }
 
 function render() {
-  const list = DATA[tab];
+  if (!DATA) return;
+  const list = DATA[tab] || [];
   const idx = PERIODS.indexOf(period);
   const sorted = list
     .map((p) => ({ p, v: valOf(p) }))
@@ -314,7 +321,28 @@ function render() {
     })
     .join("");
 }
-render();
+
+// Данные грузим отдельным запросом: пулы + JS вместе не проходят лимит ответа
+fetch("/api/pools")
+  .then((r) => r.json())
+  .then((j) => {
+    if (!j || j.error) {
+      document.getElementById("rows").innerHTML = '<tr><td colspan="7" class="muted">Not synced yet</td></tr>';
+      return;
+    }
+    DATA = {
+      updatedAt: j.updatedAt,
+      blueChip: prep(j.blueChip),
+      stableCoin: prep(j.stableCoin),
+      fix: prep(j.fix),
+    };
+    setUpdated(DATA.updatedAt);
+    render();
+  })
+  .catch(() => {
+    document.getElementById("rows").innerHTML = '<tr><td colspan="7" class="muted">Failed to load pools</td></tr>';
+  });
+setInterval(function(){ if (DATA) setUpdated(DATA.updatedAt); }, 30000);
 </script>
 </body></html>`;
 }
@@ -325,5 +353,6 @@ export function renderApiJson(data) {
     updatedAt: data.updatedAt,
     blueChip: data.blueChip,
     stableCoin: data.stableCoin,
+    fix: data.fix,
   });
 }

@@ -4,7 +4,7 @@
 // (MOEX ISS отдаёт ~1KB на инструмент) — на бесплатном тарифе Workers помещается
 // с большим запасом, крон обновляет сам.
 
-import { RF_WATCHLIST } from "./config.js";
+import { RF_WATCHLIST, RF_WALLET } from "./config.js";
 
 const ISS = "https://iss.moex.com/iss";
 const KV_RF = "rf"; // { updatedAt, items: [...] }
@@ -123,4 +123,61 @@ export async function getRF(env) {
   const raw = await env.DATA.get(KV_RF);
   if (raw) return JSON.parse(raw);
   return refreshRF(env);
+}
+
+// ---------- Синтетический кошелёк «Russian Stocks» ----------
+// Курс USD/RUB с MOEX (валютный рынок)
+async function fetchUsdRub() {
+  const url = `${ISS}/engines/currency/markets/selt/boards/CETS/securities/USD000UTSTOM.json` +
+    "?iss.meta=off&iss.only=marketdata&marketdata.columns=SECID,LAST";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`MOEX rate ${res.status}`);
+  const j = await res.json();
+  const md = zip(j.marketdata.columns, j.marketdata.data);
+  const last = md[0]?.LAST;
+  return last ? Number(last) : null;
+}
+
+// Снапшот РФ-кошелька: позиции по паям/акциям из RF_WALLET.holdings (цена пая INAV)
+export async function rfWalletSnapshot() {
+  const rate = await fetchUsdRub();
+  if (!rate) throw new Error("USD/RUB rate unavailable");
+  const secs = await Promise.all(
+    RF_WALLET.holdings.map((h) => fetchSecurity(h).catch((e) => ({ secid: h.secid, error: String(e.message || e) })))
+  );
+  const positions = [];
+  let total = 0;
+  RF_WALLET.holdings.forEach((h, i) => {
+    const s = secs[i];
+    const price = s.lastValue ?? s.last; // цена пая/бумаги в рублях
+    if (price == null || s.error) throw new Error(`MOEX ${h.secid}: ${s.error || "no price"}`);
+    const value = (price * h.units) / rate;
+    total += value;
+    positions.push({
+      value,
+      symbol: h.secid,
+      name: h.name,
+      icon: "",
+      chain: "moex",
+      type: "wallet",
+      cat: "stable", // денежный рынок ≈ стейбл
+      protocol: "MOEX",
+      amount: h.units,
+      pool: null,
+    });
+  });
+  return {
+    id: RF_WALLET.id,
+    name: RF_WALLET.name,
+    address: RF_WALLET.address,
+    sources: RF_WALLET.sources,
+    ok: true,
+    error: null,
+    posError: null,
+    portfolio: { total, chains: {}, types: {}, changes: {} },
+    positions,
+    categories: { stable: total, crypto: 0, defi: 0, borrowed: 0 },
+    health: null,
+    checkedAt: new Date().toISOString(),
+  };
 }

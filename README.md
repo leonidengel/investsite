@@ -11,7 +11,7 @@
 | Сайт | URL | Что это |
 |---|---|---|
 | Дашборд портфеля | https://portfolio.leonidengel.workers.dev | общий donut по двум кошелькам, активы, кнопки DeBank/Krystal |
-| Горячие пулы | https://portfolio.leonidengel.workers.dev/pools | топ-30 Best Blue-chip / Best Stable Coin Pools (пары из watchlist), APY за окна 7–180 дней |
+| Горячие пулы | https://portfolio.leonidengel.workers.dev/pools | топ-30 в каждой категории: Best Blue-chip / Best Stable Coin Pools (LP-пары из watchlist) + Fix (одиночные монеты — лендинг/стейкинг), APY за окна 24ч/7–180 дней |
 | РФ-инструменты | `/api/rf` | 8 инструментов (акции/ОФЗ/паи) в JSON |
 | Лендинг (заглушка) | https://lp.leonidengel.workers.dev | заглушка, допилим позже |
 
@@ -30,14 +30,19 @@
   **скрипт `scripts/sync-pools.mjs`** (Mac или GitHub Actions раз в час):
   качает дамп → фильтрует пары из watchlist (30+30 пулов) → считает средние
   APY из chart-истории → пишет готовые строки в KV (`poolsHtml`, `poolsJson`).
-  Worker только отдаёт их (0 CPU).
+  Worker только отдаёт их (0 CPU). Страница `/pools` — лёгкая оболочка,
+  данные браузер тянет из `/api/pools` (оболочка+данные вместе превышают
+  лимит ответа ~19.5KB, тот же приём, что с дашбордом на `/dash.js`).
 - **API:** `/api/data` (портфели), `/api/pools` (пулы), `/api/rf` (РФ),
   `/api/refresh` (обновить портфель + РФ).
 
 ## Кошельки (src/config.js → WALLETS)
 
-- Кошелёк A: `0x8d95…` — источники: DeBank, Krystal
-- Кошелёк B: `0x374d…` — источник: DeBank
+- **Rabby wallet**: `0x8d95…` — источники: DeBank, Krystal
+- **Tangem wallet**: `0x374d…` — источник: DeBank
+- **Russian Stocks**: синтетический кошелёк — MOEX, 20 паёв фонда АКММ
+  (Альфа Денежный рынок). Считается на лету в `src/rf.js`
+  (`rfWalletSnapshot`): цена пая с INAV-доски × 20 / курс USD-RUB
 
 ## Горячие пулы — как обновляются
 

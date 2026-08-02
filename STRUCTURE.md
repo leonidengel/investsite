@@ -21,11 +21,14 @@ portfolio.engels/
 │   │                              (/, /pools, /api/*) — тонкий, без рендера
 │   ├── dashboard.js             ← статичная HTML-оболочка дашборда; браузер
 │   │                              сам тянет /api/data и рисует donut+карточки
-│   ├── config.js                ← WALLETS, RF_WATCHLIST (8 бумаг), POOL_BLUE/STABLE
+│   ├── config.js                ← WALLETS (Rabby/Tangem + Russian Stocks),
+│   │                              RF_WATCHLIST (8 бумаг), POOL_BLUE/STABLE
 │   │                              TOKENS, карта сетей DefiLlama, палитра
 │   ├── pools.js                 ← логика пулов для скрипта: классификация по
-│   │                              watchlist, средние APY из chart, рендер страницы
-│   └── rf.js                    ← РФ-инструменты: MOEX ISS, per-security, watchlist
+│   │                              watchlist (blue-chip/stable/fix), средние APY
+│   │                              из chart, рендер оболочки страницы
+│   └── rf.js                    ← РФ-инструменты: MOEX ISS, per-security, watchlist,
+│                                  rfWalletSnapshot() — кошелёк Russian Stocks
 │
 ├── scripts/
 │   └── sync-pools.mjs           ← качает дамп DefiLlama, фильтрует, считает APY,
@@ -45,7 +48,8 @@ portfolio.engels/
   деплоятся отдельно.
 - **Бесплатный тариф Workers = 10мс CPU/запрос.** Поэтому:
   - дашборд рендерится в браузере (статичная оболочка + `/api/data`);
-  - пулы рендерит внешний скрипт (`sync-pools.mjs`), worker отдаёт готовое из KV;
+  - пулы рендерит внешний скрипт (`sync-pools.mjs`), worker отдаёт из KV
+    оболочку `/pools` (без данных) + `/api/pools` (JSON, тянет браузер);
   - РФ — маленький watchlist, крон справляется сам.
 - **Кэш/служебное** (`.wrangler/`, `.sync-out/`, `.DS_Store`) — не в Git
   (см. `.gitignore`).

@@ -1,5 +1,5 @@
 import { WALLETS, STABLECOIN_SYMBOLS } from "./config.js";
-import { refreshRF, getRF } from "./rf.js";
+import { refreshRF, getRF, rfWalletSnapshot } from "./rf.js";
 import { DASHBOARD_HTML, DASHBOARD_JS } from "./dashboard.js";
 
 const KV_KEY = "snapshot";
@@ -146,6 +146,17 @@ async function refreshAll(env) {
       checkedAt: new Date().toISOString(),
     });
     await new Promise((r) => setTimeout(r, 250)); // разносим запросы, чтобы не ловить 429
+  }
+  // Синтетический РФ-кошелёк (MOEX: паи АКММ и т.п.)
+  try {
+    wallets.push(await rfWalletSnapshot());
+  } catch (e) {
+    wallets.push({
+      id: "wallet-c", name: "Russian Stocks", address: "MOEX", sources: [],
+      ok: false, error: String(e.message || e), portfolio: null, positions: [],
+      categories: { stable: 0, crypto: 0, defi: 0, borrowed: 0 }, health: null,
+      posError: null, checkedAt: new Date().toISOString(),
+    });
   }
   const snapshot = { updatedAt: new Date().toISOString(), wallets };
   await env.DATA.put(KV_KEY, JSON.stringify(snapshot));

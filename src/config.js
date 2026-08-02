@@ -3,7 +3,7 @@
 export const WALLETS = [
   {
     id: "wallet-a",
-    name: "Кошелёк A",
+    name: "Rabby wallet",
     address: "0x8d957ca626df9280dc0662f39fc76d4f250ae2f1",
     sources: [
       { name: "DeBank", url: "https://debank.com/profile/0x8d957ca626df9280dc0662f39fc76d4f250ae2f1" },
@@ -12,13 +12,23 @@ export const WALLETS = [
   },
   {
     id: "wallet-b",
-    name: "Кошелёк B",
+    name: "Tangem wallet",
     address: "0x374db5dfa3ca89993ef0aa447dcde99e3e43577b",
     sources: [
       { name: "DeBank", url: "https://debank.com/profile/0x374db5dfa3ca89993ef0aa447dcde99e3e43577b" },
     ],
   },
 ];
+
+// Синтетический кошелёк с российскими инструментами (MOEX, цена пая INAV).
+// «Russian Stocks» держит 20 паёв фонда АКММ (Альфа Капитал Денежный рынок).
+export const RF_WALLET = {
+  id: "wallet-c",
+  name: "Russian Stocks",
+  address: "MOEX · AKMMA",
+  sources: [{ name: "MOEX", url: "https://www.moex.com/ru/issue.aspx?board=INAV&code=AKMMA" }],
+  holdings: [{ secid: "AKMMA", klass: "pifs", name: "АКММ · Альфа Денежный рынок", units: 20 }],
+};
 
 // РФ-инструменты: watchlist (бэкенд /api/rf). Классы: stocks (TQBR), bonds (TQOB), pifs (INAV).
 export const RF_WATCHLIST = [
