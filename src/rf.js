@@ -5,6 +5,7 @@
 // с большим запасом, крон обновляет сам.
 
 import { RF_WATCHLIST, RF_WALLET } from "./config.js";
+import { getUsdtRub } from "./rates.js";
 
 const ISS = "https://iss.moex.com/iss";
 const KV_RF = "rf"; // { updatedAt, items: [...] }
@@ -126,35 +127,25 @@ export async function getRF(env) {
 }
 
 // ---------- Синтетический кошелёк «Russian Stocks» ----------
-// Курс USD/RUB с MOEX (валютный рынок)
-async function fetchUsdRub() {
-  const url = `${ISS}/engines/currency/markets/selt/boards/CETS/securities/USD000UTSTOM.json` +
-    "?iss.meta=off&iss.only=marketdata&marketdata.columns=SECID,LAST";
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`MOEX rate ${res.status}`);
-  const j = await res.json();
-  const md = zip(j.marketdata.columns, j.marketdata.data);
-  const last = md[0]?.LAST;
-  return last ? Number(last) : null;
-}
-
-// Снапшот РФ-кошелька: позиции по паям/акциям из RF_WALLET.holdings (цена пая INAV)
-export async function rfWalletSnapshot() {
-  const rate = await fetchUsdRub();
-  if (!rate) throw new Error("USD/RUB rate unavailable");
+// Всё в рублях: цены MOEX INAV × количество паёв. В доллары НЕ переводим —
+// карточка показывает ₽. Для общего donut (в USD) клиент конвертирует через
+// поле valueUsd (курс USDT→₽ берём из rates.js — один источник с верхним блоком).
+export async function rfWalletSnapshot(env) {
+  const rate = await getUsdtRub(env); // ₽ за 1 USDT (≈ USD), для USD-полей donut
   const secs = await Promise.all(
     RF_WALLET.holdings.map((h) => fetchSecurity(h).catch((e) => ({ secid: h.secid, error: String(e.message || e) })))
   );
   const positions = [];
-  let total = 0;
+  let totalRub = 0;
   RF_WALLET.holdings.forEach((h, i) => {
     const s = secs[i];
     const price = s.lastValue ?? s.last; // цена пая/бумаги в рублях
     if (price == null || s.error) throw new Error(`MOEX ${h.secid}: ${s.error || "no price"}`);
-    const value = (price * h.units) / rate;
-    total += value;
+    const valueRub = price * h.units;
+    totalRub += valueRub;
     positions.push({
-      value,
+      value: valueRub, // ₽ — так показывает карточка
+      valueUsd: valueRub / rate, // для donut и «All wallets»
       symbol: h.secid,
       name: h.name,
       icon: "",
@@ -166,6 +157,7 @@ export async function rfWalletSnapshot() {
       pool: null,
     });
   });
+  const totalUsd = totalRub / rate;
   return {
     id: RF_WALLET.id,
     name: RF_WALLET.name,
@@ -174,9 +166,11 @@ export async function rfWalletSnapshot() {
     ok: true,
     error: null,
     posError: null,
-    portfolio: { total, chains: {}, types: {}, changes: {} },
+    currency: "RUB", // клиент показывает ₽ и форматирует по-русски
+    portfolio: { total: totalRub, totalUsd, chains: {}, types: {}, changes: {} },
     positions,
-    categories: { stable: total, crypto: 0, defi: 0, borrowed: 0 },
+    categories: { stable: totalRub, crypto: 0, defi: 0, borrowed: 0 }, // в ₽
+    categoriesUsd: { stable: totalUsd, crypto: 0, defi: 0, borrowed: 0 }, // для donut
     health: null,
     checkedAt: new Date().toISOString(),
   };

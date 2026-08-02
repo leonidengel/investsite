@@ -12,7 +12,7 @@ export const POOL_PERIODS = [7, 30, 60, 90, 120, 180];
 export const MIN_MEAN_POINTS = 5; // минимум дневных точек в окне, иначе «—»
 
 const MIN_TVL = 500_000; // отсекаем мусор с копеечным TVL и «APY» 10000%
-const TOP_N = 30; // по сколько пулов в каждой категории (watchlist, не весь рынок)
+const TOP_N = 50; // по сколько пулов в каждой категории (watchlist, не весь рынок)
 
 const BLUE = new Set(POOL_BLUE_TOKENS.map((t) => t.toUpperCase()));
 const STABLE = new Set(POOL_STABLE_TOKENS.map((t) => t.toUpperCase()));
@@ -322,19 +322,18 @@ function render() {
     .join("");
 }
 
-// Данные грузим отдельным запросом: пулы + JS вместе не проходят лимит ответа
-fetch("/api/pools")
-  .then((r) => r.json())
-  .then((j) => {
-    if (!j || j.error) {
-      document.getElementById("rows").innerHTML = '<tr><td colspan="7" class="muted">Not synced yet</td></tr>';
-      return;
-    }
+// Данные грузим отдельными запросами: 150 пулов + JS вместе не проходят лимит
+// ответа, поэтому тянем индекс + каждую категорию по отдельности (~10KB каждая).
+function loadCat(name) {
+  return fetch("/api/pools?cat=" + name).then((r) => r.json());
+}
+Promise.all([loadCat("blueChip"), loadCat("stableCoin"), loadCat("fix")])
+  .then((arr) => {
     DATA = {
-      updatedAt: j.updatedAt,
-      blueChip: prep(j.blueChip),
-      stableCoin: prep(j.stableCoin),
-      fix: prep(j.fix),
+      updatedAt: arr[0].updatedAt,
+      blueChip: prep(arr[0].pools),
+      stableCoin: prep(arr[1].pools),
+      fix: prep(arr[2].pools),
     };
     setUpdated(DATA.updatedAt);
     render();
@@ -347,12 +346,12 @@ setInterval(function(){ if (DATA) setUpdated(DATA.updatedAt); }, 30000);
 </body></html>`;
 }
 
-// JSON для /api/pools (те же данные, компактно)
-export function renderApiJson(data) {
-  return JSON.stringify({
-    updatedAt: data.updatedAt,
-    blueChip: data.blueChip,
-    stableCoin: data.stableCoin,
-    fix: data.fix,
-  });
+// JSON для /api/pools — по одному ответу на категорию: все 150 пулов вместе
+// (~29KB) не проходят через лимит ответа бесплатного тарифа ~19.5KB, поэтому
+// sync-скрипт пишет каждую категорию отдельным KV-ключом (как defiRates по сетям).
+export function renderApiJsonCategory(name, data) {
+  return JSON.stringify({ updatedAt: data.updatedAt, name, pools: data[name] });
+}
+export function renderApiJsonIndex(data) {
+  return JSON.stringify({ updatedAt: data.updatedAt, cats: ["blueChip", "stableCoin", "fix"] });
 }

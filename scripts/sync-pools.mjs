@@ -15,7 +15,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPoolsData, renderPoolsPage, renderApiJson } from "../src/pools.js";
+import { buildPoolsData, renderPoolsPage, renderApiJsonIndex, renderApiJsonCategory } from "../src/pools.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -78,18 +78,25 @@ async function main() {
   if (!data.blueChip.length && !data.stableCoin.length && !data.fix.length) throw new Error("не нашлось пулов по watchlist");
 
   const html = renderPoolsPage(data, SUBDOMAIN);
-  const json = renderApiJson(data);
+  // JSON по одному ключу на категорию: все 150 пулов (~29KB) не проходят
+  // лимит ответа бесплатного тарифа, клиент тянет категории по отдельности.
+  const cats = ["blueChip", "stableCoin", "fix"];
   const ratesByChain = buildRates(dump);
   fs.mkdirSync(OUT, { recursive: true });
   const htmlFile = path.join(OUT, "pools.html");
-  const jsonFile = path.join(OUT, "pools.json");
-  fs.writeFileSync(htmlFile, html);
-  fs.writeFileSync(jsonFile, json);
+  const jsonFiles = {};
+  for (const c of cats) {
+    jsonFiles[c] = path.join(OUT, `pools-${c}.json`);
+    fs.writeFileSync(jsonFiles[c], renderApiJsonCategory(c, data));
+  }
+  const idxFile = path.join(OUT, "pools-index.json");
+  fs.writeFileSync(idxFile, renderApiJsonIndex(data));
   const totalBytes = Object.entries(ratesByChain).reduce((s, [, m]) => s + JSON.stringify(m).length, 0);
-  console.log(`[sync-pools] рендер: html ${(html.length / 1024).toFixed(1)}KB, json ${(json.length / 1024).toFixed(1)}KB, rates по ${Object.keys(ratesByChain).length} сетям (${(totalBytes / 1024).toFixed(1)}KB всего)`);
+  console.log(`[sync-pools] рендер: html ${(html.length / 1024).toFixed(1)}KB, категории: ${cats.map((c) => `${c} ${(jsonFiles[c] ? fs.statSync(jsonFiles[c]).size / 1024 : 0).toFixed(1)}KB`).join(", ")}, rates по ${Object.keys(ratesByChain).length} сетям (${(totalBytes / 1024).toFixed(1)}KB всего)`);
 
   await putKV("poolsHtml", htmlFile);
-  await putKV("poolsJson", jsonFile);
+  for (const c of cats) await putKV(`poolsJson:${c}`, jsonFiles[c]);
+  await putKV("poolsIndex", idxFile);
   // Ставки: индекс + по одному ключу на сеть (большой единый ответ не проходит)
   const ratesIndexFile = path.join(OUT, "defirates-index.json");
   fs.writeFileSync(ratesIndexFile, JSON.stringify({ chains: Object.keys(ratesByChain).sort() }));

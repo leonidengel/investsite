@@ -18,7 +18,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .wrap { max-width:1280px; margin:0 auto; }
   h1 { font-size:22px; margin:0 0 4px; }
   .sub { color:#66718a; font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .cards { display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }
+  .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
   @media (max-width:640px) {
     body { padding:12px; padding-top:max(12px, env(safe-area-inset-top)); padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
     .cards { grid-template-columns:1fr; }
@@ -30,7 +30,7 @@ export const DASHBOARD_HTML = `<!doctype html>
              animation:spin .8s linear infinite; margin:40px auto; }
   @keyframes spin { to { transform:rotate(360deg); } }
   .loading-txt { color:#8b93a7; font-size:13px; text-align:center; margin-top:-20px; padding-bottom:40px; }
-  .stats { display:flex; gap:16px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:#66718a; }
+  .stats { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:#66718a; }
   .stat b { color:#1b2433; }
   .stat.debt b { color:#dc2626; }
   .card { background:#fff; border:1px solid #e4e8f0; border-radius:14px; padding:18px;
@@ -44,6 +44,20 @@ export const DASHBOARD_HTML = `<!doctype html>
   .warn { background:#fff7e6; border:1px solid #f0d9a8; color:#8a5a00; padding:10px 14px;
           border-radius:10px; margin-bottom:18px; font-size:13px; }
   .warn code { background:#fff0c7; padding:2px 6px; border-radius:4px; }
+  .comb-cols { display:grid; grid-template-columns:1fr 1.2fr 1.4fr; margin-top:2px; }
+  .comb-col { padding:0 18px; min-width:0; }
+  .comb-col:first-child { padding-left:0; }
+  .comb-col + .comb-col { border-left:1px solid #e4e8f0; }
+  .rate { display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; padding:4px 0; }
+  .rate span { color:#5a6478; }
+  .rate b, .fng b { font-variant-numeric:tabular-nums; }
+  .fng { display:flex; align-items:center; gap:8px; font-size:13px; margin-top:10px; padding-top:10px; border-top:1px dashed #e4e8f0; }
+  .fng-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  @media (max-width:640px) {
+    .comb-cols { grid-template-columns:1fr; }
+    .comb-col { padding:12px 0; }
+    .comb-col + .comb-col { border-left:none; border-top:1px solid #e4e8f0; }
+  }
   .total-row { display:flex; align-items:baseline; gap:12px; margin:2px 0 14px; }
   .total { font-size:24px; font-weight:700; }
   .total.big { font-size:30px; }
@@ -63,21 +77,18 @@ export const DASHBOARD_HTML = `<!doctype html>
   .lp-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .lp-main { flex:1; min-width:0; }
   .lp-pair b { font-size:13px; }
-  .lp-id { color:#8b93a7; font-size:10px; font-weight:400; }
+  .lp-id, .lp-sub { color:#8b93a7; font-size:10px; }
+  .lp-id { font-weight:400; }
   .lp-fee { color:#3b6ef5; font-size:11px; font-weight:600; }
-  .lp-sub { color:#8b93a7; font-size:10px; }
-  .lp-rate { align-self:center; color:#0e9f6e; font-size:11px; font-weight:600; white-space:nowrap; }
+  .lp-apy { color:#0e9f6e; font-size:11px; font-weight:600; white-space:nowrap; }
   .lp-total { font-weight:700; font-size:13px; align-self:center; }
   .lp-sec { font-size:10px; color:#8b93a7; text-transform:uppercase; letter-spacing:.5px; margin:8px 0 2px; }
-  .lp-apy { font-size:11px; font-weight:600; color:#0e9f6e; white-space:nowrap; }
   .lp-apy.down { color:#dc2626; }
   .lp-hf { font-size:11px; font-weight:700; white-space:nowrap; align-self:center; }
   .hf-ok { color:#0e9f6e; }
   .hf-warn { color:#d97706; }
   .hf-bad { color:#dc2626; }
   .lp-toks { margin-top:8px; border-top:1px dashed #e4e8f0; }
-  .lp-tok { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; }
-  .lp-sym { width:70px; font-weight:600; flex-shrink:0; }
   .lp-amt { flex:1; color:#66718a; font-variant-numeric:tabular-nums; }
   .lp-val { color:#1b2433; font-weight:600; font-variant-numeric:tabular-nums; }
   .ic { width:22px; height:22px; border-radius:50%; flex-shrink:0; }
@@ -93,6 +104,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .src, .refresh { font-size:12px; color:#3b6ef5; text-decoration:none; border:1px solid #dbe3f7;
                    padding:6px 12px; border-radius:8px; background:#fff; cursor:pointer; font-family:inherit; }
   .src:hover, .refresh:hover { background:#f4f7ff; }
+  .lp-tok { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; }
+  .lp-sym { width:70px; font-weight:600; flex-shrink:0; }
   .loading { color:#8b93a7; padding:40px; text-align:center; }
   .err-msg { color:#dc2626; }
 </style></head><body>
@@ -112,7 +125,7 @@ var COLORS = ["#7aa2ff","#3ddc84","#ffb454","#ff7a9c","#9b7aff","#5bd3c7","#e05f
 var TYPE_NAMES = { wallet:"Wallet", deposit:"Deposit", loan:"Loan", borrowed:"Borrowed", staked:"Staked", locked:"Locked", vesting:"Vesting", reward:"Reward" };
 var CHAIN_NAMES = { ethereum:"Ethereum", arbitrum:"Arbitrum", optimism:"Optimism", base:"Base", polygon:"Polygon", bsc:"BNB Chain", "binance-smart-chain":"BNB Chain", monad:"Monad", avalanche:"Avalanche", solana:"Solana", fantom:"Fantom", linea:"Linea", zksync:"zkSync", mantle:"Mantle", gnosis:"Gnosis", celo:"Celo", xdai:"Gnosis", "avalanche-c":"Avalanche" };
 
-// Zerion-сеть/протокол → имена DefiLlama для сверки ставок (APR/TVL)
+// Zerion → DefiLlama (для ставок APR/TVL)
 var DL_CHAINS = { ethereum:"Ethereum", arbitrum:"Arbitrum", optimism:"OP Mainnet", base:"Base", polygon:"Polygon", "binance-smart-chain":"BSC", bsc:"BSC", avalanche:"Avalanche", fantom:"Fantom", linea:"Linea", mantle:"Mantle", monad:"Monad", solana:"Solana", scroll:"Scroll", blast:"Blast", sei:"Sei", zksync:"ZKsync Era", gnosis:"Gnosis", celo:"Celo" };
 var DL_PROJ = { "Uniswap V3":"uniswap-v3", "Uniswap V4":"uniswap-v4", "PancakeSwap V3":"pancakeswap-amm-v3", "Aave V3":"aave-v3", "Aave V4":"aave-v4", "Aave V2":"aave-v3", "Morpho":"morpho-blue", "Morpho Blue":"morpho-blue" };
 function normSymDL(s){ var t = String(s||"").toUpperCase(); t = t.replace(/\.(E|B|W)$/,""); if (t === "USD₮0" || t === "USDT0") t = "USDT"; return t; }
@@ -139,6 +152,24 @@ function fmtMoney(v) {
 }
 
 function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function fngColor(v) {
+  if (v == null) return "#8b93a7";
+  if (v < 25) return "#dc2626";
+  if (v < 45) return "#f97316";
+  if (v < 55) return "#d97706";
+  if (v < 75) return "#84cc16";
+  return "#0e9f6e";
+}
+function ratesHtml(r) {
+  var rows = "";
+  if (r && r.btcUsd) rows += '<div class="rate"><span>₿ Bitcoin</span><b>' + fmtUSD(r.btcUsd) + "</b></div>";
+  if (r && r.ethUsd) rows += '<div class="rate"><span>Ξ Ethereum</span><b>' + fmtUSD(r.ethUsd) + "</b></div>";
+  if (r && r.usdtRub) rows += '<div class="rate"><span>₮ USDT → ₽</span><b>' + fmtRUB(r.usdtRub) + "</b></div>";
+  var fng = (r && r.fng != null)
+    ? '<div class="fng"><span class="fng-dot" style="background:' + fngColor(r.fng) + '"></span><b>' + r.fng + "</b> " + esc(r.fngLabel) + "</div>"
+    : "";
+  return '<div class="comb-col"><h3 class="sec">Markets</h3>' + rows + fng + "</div>";
+}
 // «обновлено X мин назад» (относительное время)
 function timeAgo(iso) {
   var ms = Date.now() - new Date(iso).getTime();
@@ -150,6 +181,7 @@ function timeAgo(iso) {
   return Math.floor(h / 24) + " days ago";
 }
 var LAST_UPDATED = null;
+var MARKETS = null; // /api/rates: { btcUsd, ethUsd, usdtRub, fng, fngLabel }
 function setUpdated(iso) {
   LAST_UPDATED = iso;
   var el = document.getElementById("upd");
@@ -158,6 +190,10 @@ function setUpdated(iso) {
 function fmtUSD(v) {
   if (v == null || isNaN(v)) return "—";
   return "$" + v.toLocaleString("en-US", { maximumFractionDigits: v >= 1000 ? 0 : 2 });
+}
+function fmtRUB(v) {
+  if (v == null || isNaN(v)) return "—";
+  return v.toLocaleString("ru-RU", { maximumFractionDigits: v >= 1000 ? 0 : 2 }) + " ₽";
 }
 function fmtPct(v) { return (Number(v) || 0).toFixed(1) + "%"; }
 function shortAddr(a) { return a.slice(0,6) + "…" + a.slice(-4); }
@@ -193,35 +229,45 @@ function legend(entries) {
   }).join("");
 }
 function combined(snap) {
+  // Нетто-донат: DeFi показываем за вычетом долга (borrowed), чтобы верхняя
+  // сумма «All wallets» ВСЕГДА равнялась сумме сегментов доната. Долг — отдельной
+  // красной строкой в самари и в карточке кошелька.
   var cats = { stable:0, crypto:0, defi:0, borrowed:0 }, total = 0, num = 0, den = 0;
   snap.wallets.forEach(function(w){
     if (!w.ok || !w.portfolio) return;
-    total += w.portfolio.total || 0;
-    var c = w.categories || {};
+    total += w.portfolio.totalUsd || w.portfolio.total || 0; // РФ-кошелёк: total в ₽, для доната totalUsd
+    var c = w.categoriesUsd || w.categories || {};
     cats.stable += c.stable || 0;
     cats.crypto += c.crypto || 0;
     cats.defi += c.defi || 0;
     cats.borrowed += c.borrowed || 0;
+    var base = w.portfolio.totalUsd || w.portfolio.total || 0;
     var pct = w.portfolio.changes && w.portfolio.changes.percent_1d;
-    if (pct !== undefined && w.portfolio.total) { num += w.portfolio.total * pct; den += w.portfolio.total; }
+    if (pct !== undefined && base) { num += base * pct; den += base; }
   });
+  var defiNet = Math.max(cats.defi - cats.borrowed, 0);
   var top = [
     { label:"Stablecoins", value:cats.stable, color:"#3ddc84" },
     { label:"Crypto", value:cats.crypto, color:"#7aa2ff" },
-    { label:"In DeFi", value:cats.defi, color:"#ffb454" },
+    { label:"In DeFi (net)", value:defiNet, color:"#ffb454" },
   ].filter(function(e){ return e.value > 0; });
-  return { total: total, change: den ? num / den : undefined, top: top, cats: cats };
+  // Верхняя сумма = сумма сегментов доната (stable + crypto + defi net), чтобы
+  // «All wallets» ВСЕГДА совпадала с диаграммой. portfolio.total может
+  // отличаться на копейки из-за округлений Zerion — не берём его в сумму.
+  total = cats.stable + cats.crypto + defiNet;
+  return { total: total, change: den ? num / den : undefined, top: top, cats: cats, defiNet: defiNet };
 }
-// Строка «в пулах vs на кошельке» (как у Krystal) + долг, если есть
-function defiRow(c) {
+function defiRow(c, fmt) {
+  fmt = fmt || fmtUSD;
   c = c || {};
   var defi = c.defi || 0, wallet = (c.stable || 0) + (c.crypto || 0), borrowed = c.borrowed || 0;
-  var assets = defi + wallet;
-  if (!assets) return "";
-  var p = Math.round(defi / assets * 100);
-  var html = '<div class="stats"><span class="stat">💰 In pools: <b>' + fmtUSD(defi) + '</b> (' + p + '%)</span>' +
-    '<span class="stat">💼 Available: <b>' + fmtUSD(wallet) + '</b></span>';
-  if (borrowed > 0) html += '<span class="stat debt">💳 Debt: <b>' + fmtUSD(borrowed) + '</b></span>';
+  var defiNet = Math.max(defi - borrowed, 0); // нетто: в пулах за вычетом долга
+  var assets = defiNet + wallet;
+  if (!assets && !borrowed) return "";
+  var p = assets ? Math.round(defiNet / assets * 100) : 0;
+  var html = '<div class="stats"><span class="stat">💰 In pools: <b>' + fmt(defiNet) + '</b> (' + p + '%)</span>' +
+    '<span class="stat">💼 Available: <b>' + fmt(wallet) + '</b></span>';
+  if (borrowed > 0) html += '<span class="stat debt">💳 Debt: <b>' + fmt(borrowed) + '</b></span>';
   return html + '</div>';
 }
 function fmtAmount(v) {
@@ -230,16 +276,11 @@ function fmtAmount(v) {
   if (v >= 1) return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
   return v.toLocaleString("en-US", { maximumFractionDigits: 6 });
 }
-// Разбираем «PancakeSwap V3 USDT/USDe Pool (#7038688)» → { protocol, pair, id }
-// Пара — последний сегмент с "/" перед " Pool (#id)". ВАЖНО: внутри внешнего
-// шаблона-литерала бэкслеши удваиваются (\\\\ → \\ в клиенте).
 function parsePool(name) {
   var m = name.match(/^(.*?)\\s+([^\\s/]+)\\/([^\\s/]+)\\s+Pool\\s+\\(#(\\d+)\\)$/);
   if (!m) return { protocol: name, pair: name, id: "" };
   return { protocol: m[1], pair: m[2] + "/" + m[3], id: "#" + m[4] };
 }
-// Группируем позиции: LP-пары (одинаковый pool) — одной карточкой; лендинг
-// (Aave/Morpho, протокол + депозит/займ) — карточками как в DeBank; остальное — как есть.
 var LP_TYPES = { deposit: 1, staked: 1, locked: 1, vesting: 1 };
 var LEND_TYPES = { deposit: 1, staked: 1, locked: 1, vesting: 1, loan: 1, borrowed: 1 };
 function groupPositions(pos) {
@@ -294,7 +335,6 @@ function lpCard(g, fees) {
     '<div class="lp-total">' + fmtUSD(g.total) + "</div></div>" +
     '<div class="lp-toks">' + tokens + "</div></div>";
 }
-// Карточка лендинга (Aave/Morpho) в стиле DeBank: депозиты + займы с APY и Health Factor
 function lendingCard(l, health) {
   var row = function(a, borrow){
     var apy = rateFor(l.chain, l.protocol, a.symbol);
@@ -324,6 +364,7 @@ function lendingCard(l, health) {
   return html + "</div>";
 }
 function walletCard(w, wi) {
+  var fmt = w.currency === "RUB" ? fmtRUB : fmtUSD; // Russian Stocks — в рублях
   if (!w.ok) {
     return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="err">ERR</span>' +
       '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
@@ -345,14 +386,14 @@ function walletCard(w, wi) {
     return '<div class="arow">' + icon +
       '<div class="aname"><b>' + esc(a.symbol) + "</b><span>" + esc(sub) + "</span></div>" +
       '<div class="abar"><div class="abar-fill" style="width:' + Math.max(pct, 0.4) + '%"></div></div>' +
-      '<div class="aval">' + fmtUSD(a.value) + '</div><div class="apct">' + pct.toFixed(1) + "%</div></div>";
+      '<div class="aval">' + fmt(a.value) + '</div><div class="apct">' + pct.toFixed(1) + "%</div></div>";
   }).join("");
-  return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="ok">' + (pf.total ? "OK" : "0 USD") + "</span>" +
+  return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="ok">' + (pf.total ? "OK" : "0") + "</span>" +
     '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
     srcLinks(w, "top") +
     '<div class="url">' + esc(w.address) + " · " + shortAddr(w.address) + "</div>" +
-    '<div class="total-row"><span class="total">' + fmtUSD(pf.total) + "</span> " + chgHtml(change) + "</div>" +
-    defiRow(w.categories) +
+    '<div class="total-row"><span class="total">' + fmt(pf.total) + "</span> " + chgHtml(change) + "</div>" +
+    defiRow(w.categories, fmt) +
     '<h3 class="sec">Assets</h3>' + (lpCards + lendCards + rows || '<div class="err-msg">no assets</div>') + "</div>";
 }
 function srcLinks(w, cls) {
@@ -374,9 +415,12 @@ function render(snap) {
   if (c.total) {
     html += '<div class="card comb"><div class="head"><b>All wallets</b> <span class="ok">OK</span>' +
       '<span class="time">' + timeAgo(snap.updatedAt) + "</span></div>" +
-      '<div class="total-row"><span class="total big">' + fmtUSD(c.total) + "</span> " + chgHtml(c.change) + "</div>" +
-      defiRow(c.cats) +
-      '<div class="chart-wrap">' + donut(c.top, 230, 30) + '<div class="legend">' + legend(c.top) + "</div></div></div>";
+      '<div class="comb-cols">' +
+      ratesHtml(MARKETS) +
+      '<div class="comb-col"><div class="total-row"><span class="total big">' + fmtUSD(c.total) + "</span> " + chgHtml(c.change) + "</div>" +
+      defiRow(c.cats) + "</div>" +
+      '<div class="comb-col"><div class="chart-wrap">' + donut(c.top, 230, 30) + '<div class="legend">' + legend(c.top) + "</div></div></div>" +
+      "</div></div>";
   }
   snap.wallets.forEach(function(w, i){ html += walletCard(w, i); });
   document.getElementById("cards").innerHTML = html || '<div class="loading">no data</div>';
@@ -386,9 +430,10 @@ document.getElementById("refresh").addEventListener("click", function(){
 });
 Promise.all([
   fetch("/api/data").then(function(r){ return r.json(); }),
+  fetch("/api/rates").then(function(r){ return r.json(); }).catch(function(){ return null; }),
 ]).then(function(arr){
   var snap = arr[0];
-  // Собираем ключи ставок, которые реально нужны (LP-пары + лендинг по символам)
+  MARKETS = arr[1];
   var want = {};
   var add = function(it){ if (it) want[it] = 1; };
   var pools = {};

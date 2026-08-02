@@ -1,5 +1,6 @@
 import { WALLETS, STABLECOIN_SYMBOLS } from "./config.js";
 import { refreshRF, getRF, rfWalletSnapshot } from "./rf.js";
+import { getRates, refreshRates } from "./rates.js";
 import { DASHBOARD_HTML, DASHBOARD_JS } from "./dashboard.js";
 
 const KV_KEY = "snapshot";
@@ -147,9 +148,9 @@ async function refreshAll(env) {
     });
     await new Promise((r) => setTimeout(r, 250)); // разносим запросы, чтобы не ловить 429
   }
-  // Синтетический РФ-кошелёк (MOEX: паи АКММ и т.п.)
+  // Синтетический РФ-кошелёк (MOEX: паи АКММ и т.п.) — в рублях, env для курса USDT→₽
   try {
-    wallets.push(await rfWalletSnapshot());
+    wallets.push(await rfWalletSnapshot(env));
   } catch (e) {
     wallets.push({
       id: "wallet-c", name: "Russian Stocks", address: "MOEX", sources: [],
@@ -214,6 +215,7 @@ export default {
   async scheduled(_event, env) {
     await refreshAll(env); // портфель — каждые 15 мин
     await ensureRF(env); // РФ-инструменты (раз в час). Пулы обновляет sync-pools.mjs
+    await refreshRates(env).catch((e) => console.log("rates:", e.message)); // курсы + страх/жадность
   },
 
   async fetch(request, env, ctx) {
@@ -222,16 +224,23 @@ export default {
     try {
       if (url.pathname === "/api/refresh") {
         const snap = await refreshAll(env);
-        ctx.waitUntil(ensureRF(env));
+        ctx.waitUntil(Promise.all([ensureRF(env), refreshRates(env).catch(() => null)]));
         return json(snap);
       }
       if (url.pathname === "/api/data") {
         return json(await getSnapshot(env));
       }
       if (url.pathname === "/api/pools") {
-        const raw = await env.DATA.get(KV_POOLS_JSON);
-        if (!raw) return json({ error: "ещё не синхронизировано (запусти scripts/sync-pools.mjs)", updatedAt: null });
-        return new Response(raw, { headers: { "content-type": "application/json; charset=utf-8" } });
+        // Категории отдаём по одной (все 150 пулов ~29KB не проходят лимит ответа)
+        const cat = url.searchParams.get("cat");
+        if (cat) {
+          const raw = await env.DATA.get(KV_POOLS_JSON + ":" + cat);
+          if (!raw) return json({ error: "нет категории " + cat, updatedAt: null });
+          return new Response(raw, { headers: { "content-type": "application/json; charset=utf-8" } });
+        }
+        const idx = await env.DATA.get("poolsIndex");
+        if (!idx) return json({ error: "ещё не синхронизировано (запусти scripts/sync-pools.mjs)", updatedAt: null });
+        return new Response(idx, { headers: { "content-type": "application/json; charset=utf-8" } });
       }
       if (url.pathname === "/api/defirates") {
         // Клиент запрашивает ТОЛЬКО нужные ключи: /api/defirates?q=Сеть~проект~символ,...
@@ -261,6 +270,13 @@ export default {
           }
         }
         return json(out);
+      }
+      if (url.pathname === "/api/rates") {
+        try {
+          return json(await getRates(env));
+        } catch (e) {
+          return json({ error: String(e.message || e), btcUsd: null, ethUsd: null, usdtRub: null, fng: null, fngLabel: null });
+        }
       }
       if (url.pathname === "/api/rf") {
         const rf = await getRF(env);

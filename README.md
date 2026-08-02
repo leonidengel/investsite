@@ -11,7 +11,7 @@
 | Сайт | URL | Что это |
 |---|---|---|
 | Дашборд портфеля | https://portfolio.leonidengel.workers.dev | общий donut по двум кошелькам, активы, кнопки DeBank/Krystal |
-| Горячие пулы | https://portfolio.leonidengel.workers.dev/pools | топ-30 в каждой категории: Best Blue-chip / Best Stable Coin Pools (LP-пары из watchlist) + Fix (одиночные монеты — лендинг/стейкинг), APY за окна 24ч/7–180 дней |
+| Горячие пулы | https://portfolio.leonidengel.workers.dev/pools | топ-50 в каждой категории: Best Blue-chip / Best Stable Coin Pools (LP-пары из watchlist) + Fix (одиночные монеты — лендинг/стейкинг), APY за окна 24ч/7–180 дней |
 | РФ-инструменты | `/api/rf` | 8 инструментов (акции/ОФЗ/паи) в JSON |
 | Лендинг (заглушка) | https://lp.leonidengel.workers.dev | заглушка, допилим позже |
 
@@ -28,11 +28,11 @@
 - **Горячие пулы:** DefiLlama отдаёт весь дамп 10.9MB (не умеет фильтровать),
   парсинг которого не помещается в 10мс — поэтому тяжёлую работу делает
   **скрипт `scripts/sync-pools.mjs`** (Mac или GitHub Actions раз в час):
-  качает дамп → фильтрует пары из watchlist (30+30 пулов) → считает средние
-  APY из chart-истории → пишет готовые строки в KV (`poolsHtml`, `poolsJson`).
-  Worker только отдаёт их (0 CPU). Страница `/pools` — лёгкая оболочка,
-  данные браузер тянет из `/api/pools` (оболочка+данные вместе превышают
-  лимит ответа ~19.5KB, тот же приём, что с дашбордом на `/dash.js`).
+  качает дамп → фильтрует пары из watchlist (50+50+50 пулов) → считает средние
+  APY из chart-истории → пишет готовые строки в KV (`poolsHtml`, `poolsJson:категория`).
+  Worker только отдаёт их (0 CPU). Страница `/pools` — лёгкая оболочка, данные
+  браузер тянет из `/api/pools?cat=...` по одной категории (все 150 пулов
+  ~29KB не проходят лимит ответа ~19.5KB — чанкинг, как с дашбордом на `/dash.js`).
 - **API:** `/api/data` (портфели), `/api/pools` (пулы), `/api/rf` (РФ),
   `/api/refresh` (обновить портфель + РФ).
 
@@ -41,8 +41,22 @@
 - **Rabby wallet**: `0x8d95…` — источники: DeBank, Krystal
 - **Tangem wallet**: `0x374d…` — источник: DeBank
 - **Russian Stocks**: синтетический кошелёк — MOEX, 20 паёв фонда АКММ
-  (Альфа Денежный рынок). Считается на лету в `src/rf.js`
-  (`rfWalletSnapshot`): цена пая с INAV-доски × 20 / курс USD-RUB
+  (Альфа Денежный рынок). Всё в РУБЛЯХ: `rfWalletSnapshot()` считает
+  цена пая с INAV-доски × 20 (₽), для общего donut конвертирует через
+  курс USDT→₽ (см. ниже)
+
+## Курсы валют и индекс страха/жадности
+
+- Верхний блок дашборда разделён на 3 подблока: **Markets** (₿ BTC, Ξ ETH,
+  ₮ USDT→₽, индекс страха и жадности) | **All wallets** (сумма + изменения) | **donut**.
+- Источник курсов: **CoinGecko** (BTC/ETH в USD + USDT→RUB одним запросом,
+  без ключа). BestChange API публично недоступен (таймаут/геоблок), пары
+  USDT/RUB удалены на Binance/Bybit/OKX/KuCoin/MEXC/WhiteBIT.
+- Fallback: BTC/ETH — Coinbase spot; USDT→₽ — MOEX USD/RUB (USDT≈USD).
+- F&G индекс: alternative.me. Кэш KV (`rates`), `/api/rates`.
+- **Нетто-донат:** DeFi показывается за вычетом долга (borrowed), поэтому
+  сумма «All wallets» ВСЕГДА равна сумме сегментов доната. Долг — отдельной
+  красной строкой («💳 Debt») в самари и в карточке кошелька.
 
 ## Горячие пулы — как обновляются
 

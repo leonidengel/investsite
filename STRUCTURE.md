@@ -27,8 +27,10 @@ portfolio.engels/
 │   ├── pools.js                 ← логика пулов для скрипта: классификация по
 │   │                              watchlist (blue-chip/stable/fix), средние APY
 │   │                              из chart, рендер оболочки страницы
+│   ├── rates.js                 ← курсы (CoinGecko + Coinbase/MOEX fallback)
+│   │                              и индекс страха и жадности, KV-кэш, /api/rates
 │   └── rf.js                    ← РФ-инструменты: MOEX ISS, per-security, watchlist,
-│                                  rfWalletSnapshot() — кошелёк Russian Stocks
+│                                  rfWalletSnapshot() — кошелёк Russian Stocks (₽)
 │
 ├── scripts/
 │   └── sync-pools.mjs           ← качает дамп DefiLlama, фильтрует, считает APY,
@@ -49,7 +51,8 @@ portfolio.engels/
 - **Бесплатный тариф Workers = 10мс CPU/запрос.** Поэтому:
   - дашборд рендерится в браузере (статичная оболочка + `/api/data`);
   - пулы рендерит внешний скрипт (`sync-pools.mjs`), worker отдаёт из KV
-    оболочку `/pools` (без данных) + `/api/pools` (JSON, тянет браузер);
+    оболочку `/pools` (без данных) + `/api/pools?cat=` по категориям
+    (150 пулов целиком не проходят лимит — чанкинг);
   - РФ — маленький watchlist, крон справляется сам.
 - **Кэш/служебное** (`.wrangler/`, `.sync-out/`, `.DS_Store`) — не в Git
   (см. `.gitignore`).
