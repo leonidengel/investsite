@@ -84,6 +84,7 @@ async function main() {
   const ratesByChain = buildRates(dump);
   fs.mkdirSync(OUT, { recursive: true });
   const htmlFile = path.join(OUT, "pools.html");
+  fs.writeFileSync(htmlFile, html); // оболочка страницы (без данных)
   const jsonFiles = {};
   for (const c of cats) {
     jsonFiles[c] = path.join(OUT, `pools-${c}.json`);

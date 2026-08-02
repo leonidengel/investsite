@@ -11,7 +11,7 @@ import { POOL_BLUE_TOKENS, POOL_STABLE_TOKENS, poolChainName } from "./config.js
 export const POOL_PERIODS = [7, 30, 60, 90, 120, 180];
 export const MIN_MEAN_POINTS = 5; // минимум дневных точек в окне, иначе «—»
 
-const MIN_TVL = 500_000; // отсекаем мусор с копеечным TVL и «APY» 10000%
+const MIN_TVL = 40_000; // порог TVL: от $40K (раньше было $500K)
 const TOP_N = 50; // по сколько пулов в каждой категории (watchlist, не весь рынок)
 
 const BLUE = new Set(POOL_BLUE_TOKENS.map((t) => t.toUpperCase()));
@@ -214,7 +214,7 @@ export function renderPoolsPage(data, subdomain) {
       <tbody id="rows"><tr><td colspan="7"><div class="spinner"></div></td></tr></tbody>
     </table>
   </div></div>
-  <div class="note">Blue-chip/Stable — LP pairs of major tokens (watchlist). Fix — single-coin lending/staking. Junk filtered out (TVL ≥ $0.5M, not outlier). Window APY is the pool's average APY from DefiLlama history; "—" when not enough history.</div>
+  <div class="note">Blue-chip/Stable — LP pairs of major tokens (watchlist). Fix — single-coin lending/staking. Junk filtered out (TVL ≥ $40K, not outlier). Window APY is the pool's average APY from DefiLlama history; "—" when not enough history.</div>
 </div>
 <script>
 const PERIODS = [7, 30, 60, 90, 120, 180];
