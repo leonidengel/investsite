@@ -80,14 +80,22 @@ async function fetchPx() {
   return { btcUsd, ethUsd, usdtRub, usdcRub };
 }
 
-// Общая капитализация крипторынка (CoinGecko /global)
+// Общая капитализация крипторынка: CoinGecko /global, при неудаче — Coinpaprika
+// (CoinGecko может рейт-лимитить IP Cloudflare на этом эндпоинте)
 async function fetchMcap() {
   const r = await fetchRetry("https://api.coingecko.com/api/v3/global");
-  if (!r) return null;
+  if (r) {
+    try {
+      const j = await r.json();
+      const usd = j.data?.total_market_cap?.usd;
+      if (usd != null) return Math.round(usd);
+    } catch (e) {}
+  }
+  const p = await fetchRetry("https://api.coinpaprika.com/v1/global");
+  if (!p) return null;
   try {
-    const j = await r.json();
-    const usd = j.data?.total_market_cap?.usd;
-    return usd != null ? Math.round(usd) : null;
+    const j = await p.json();
+    return j.market_cap_usd != null ? Math.round(j.market_cap_usd) : null;
   } catch (e) {
     return null;
   }
