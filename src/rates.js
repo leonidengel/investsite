@@ -80,11 +80,25 @@ async function fetchPx() {
   return { btcUsd, ethUsd, usdtRub, usdcRub };
 }
 
+// Общая капитализация крипторынка (CoinGecko /global)
+async function fetchMcap() {
+  const r = await fetchRetry("https://api.coingecko.com/api/v3/global");
+  if (!r) return null;
+  try {
+    const j = await r.json();
+    const usd = j.data?.total_market_cap?.usd;
+    return usd != null ? Math.round(usd) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function fetchRates() {
-  const [px, cbr, fng] = await Promise.all([
+  const [px, cbr, fng, mcap] = await Promise.all([
     fetchPx(),
     fetchCbr(),
     fetchRetry("https://api.alternative.me/fng/?limit=1"),
+    fetchMcap(),
   ]);
   const d = fng ? ((await fng.json().catch(() => ({})))?.data?.[0]) : null;
   return {
@@ -95,6 +109,7 @@ export async function fetchRates() {
     usdRub: cbr.usdRub ?? null,  // официальный курс ЦБ
     eurRub: cbr.eurRub ?? null,
     gbpRub: cbr.gbpRub ?? null,
+    totalMcap: mcap,             // общая капитализация, $ (для графика)
     fng: d ? Number(d.value) : null,
     fngLabel: d ? d.value_classification : null,
     updatedAt: new Date().toISOString(),

@@ -177,10 +177,17 @@ async function saveHistoryPoint(env, wallets) {
       if (!w.ok || !w.portfolio) continue;
       total += w.portfolio.totalUsd || w.portfolio.total || 0;
     }
+    // mcap (общая капитализация крипторынка) — берём из свежего кэша rates,
+    // чтобы не дёргать CoinGecko лишним запросом
+    let mcap = null;
+    try {
+      const rr = await env.DATA.get(KV_RATES);
+      if (rr) mcap = JSON.parse(rr).totalMcap ?? null;
+    } catch (e) {}
     const raw = await env.DATA.get(KV_HISTORY);
     let hist = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(hist)) hist = [];
-    hist.push({ t: Date.now(), total: Math.round(total * 100) / 100 });
+    hist.push({ t: Date.now(), total: Math.round(total * 100) / 100, mcap });
     if (hist.length > HISTORY_CAP) hist = hist.slice(-HISTORY_CAP);
     await env.DATA.put(KV_HISTORY, JSON.stringify(hist));
   } catch (e) {

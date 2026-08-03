@@ -57,6 +57,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .rate b, .fng b { font-variant-numeric:tabular-nums; }
   .fng { display:flex; align-items:center; gap:8px; font-size:13px; margin-top:10px; padding-top:10px; border-top:1px dashed #e4e8f0; }
   .fng-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .fng-g { display:flex; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px dashed #e4e8f0; font-size:12px; font-weight:600; color:#5a6478; }
   @media (max-width:640px) {
     .comb-cols { grid-template-columns:1fr; }
     .comb-col { padding:12px 0; }
@@ -448,15 +449,61 @@ function fngColor(v) {
   if (v < 75) return "#84cc16";
   return "#0e9f6e";
 }
+// Круговой индикатор страха и жадности (как на Dropstab): кольцо 0–100,
+// сегмент по значению, цвет по шкале, число и подпись в центре.
+function fngGauge(v, label) {
+  if (v == null) return '<div class="fng">F&G —</div>';
+  var R = 26, C = 2 * Math.PI * R, frac = Math.max(0, Math.min(100, v)) / 100;
+  var col = fngColor(v);
+  return '<div class="fng-g"><svg viewBox="0 0 64 64" width="64" height="64">' +
+    '<circle cx="32" cy="32" r="' + R + '" fill="none" stroke="#eef1f6" stroke-width="7"/>' +
+    '<circle cx="32" cy="32" r="' + R + '" fill="none" stroke="' + col + '" stroke-width="7" stroke-linecap="round" ' +
+    'stroke-dasharray="' + (frac * C).toFixed(1) + " " + C.toFixed(1) + '" transform="rotate(-90 32 32)"/>' +
+    '<text x="32" y="35" text-anchor="middle" font-size="17" font-weight="700" fill="#1b2433">' + v + "</text>" +
+    '<text x="32" y="47" text-anchor="middle" font-size="8.5" fill="' + col + '">' + esc(label) + "</text>" +
+    '</svg><span>Fear &amp; Greed</span></div>';
+}
 function ratesHtml(r) {
   var rows = "", c = function (lbl, v, f) { return v ? '<div class="rate"><span>' + lbl + "</span><b>" + f(v) + "</b></div>" : ""; };
   rows += c("₿ Bitcoin", r.btcUsd, fmtUSD) + c("Ξ Ethereum", r.ethUsd, fmtUSD);
   rows += c("₮ USDT→₽", r.usdtRub, fmtRUB) + c("₮ USDC→₽", r.usdcRub, fmtRUB);
   rows += c("$ USD (CBR)", r.usdRub, fmtRUB) + c("€ EUR (CBR)", r.eurRub, fmtRUB) + c("£ GBP (CBR)", r.gbpRub, fmtRUB);
-  var fng = (r && r.fng != null)
-    ? '<div class="fng"><span class="fng-dot" style="background:' + fngColor(r.fng) + '"></span><b>' + r.fng + "</b> " + esc(r.fngLabel) + "</div>"
-    : "";
-  return '<div class="comb-col"><h3 class="sec">Markets</h3>' + rows + fng + "</div>";
+  if (r && r.totalMcap) rows += '<div class="rate"><span>🌐 Total Mkt Cap</span><b>' + fmtMcap(r.totalMcap) + "</b></div>";
+  var fng = (r && r.fng != null) ? fngGauge(r.fng, r.fngLabel) : "";
+  return '<div class="comb-col"><h3 class="sec">Markets</h3>' + rows + fng +
+    '<div id="mcapChart"></div></div>';
+}
+// Общая капитализация в $T/$B + спарклайн (история mcap из /api/history)
+function fmtMcap(v) {
+  if (v == null) return "—";
+  if (v >= 1e12) return "$" + (v / 1e12).toFixed(2) + "T";
+  if (v >= 1e9) return "$" + (v / 1e9).toFixed(1) + "B";
+  return "$" + Math.round(v / 1e6) + "M";
+}
+function mcapHtml() {
+  var el = document.getElementById("mcapChart");
+  if (!el) return;
+  fetch("/api/history?days=7")
+    .then(function (r) { return r.json(); })
+    .then(function (hist) {
+      var pts = (hist || []).filter(function (p) { return p.mcap != null; });
+      if (pts.length < 2) { el.innerHTML = ""; return; }
+      el.innerHTML = spark2(pts);
+    })
+    .catch(function () { el.innerHTML = ""; });
+}
+function spark2(pts) {
+  var W = 300, H = 56, P = 4;
+  var vals = pts.map(function (p) { return p.mcap; });
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  var span = max - min || 1;
+  var x = function (i) { return P + (W - 2 * P) * i / (pts.length - 1); };
+  var y = function (v) { return H - P - (H - 2 * P) * (v - min) / span; };
+  var ptsStr = vals.map(function (v, i) { return x(i).toFixed(1) + "," + y(v).toFixed(1); });
+  var up = vals[vals.length - 1] >= vals[0];
+  return '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" height="' + H + '" style="display:block;margin-top:6px">' +
+    '<polyline points="' + ptsStr.join(" ") + '" fill="none" stroke="' + (up ? "#3b6ef5" : "#dc2626") + '" stroke-width="1.5"/>' +
+    "</svg>";
 }
 // --- Донат и легенда (переехали из /dash.js — вызываются из render после fetch) ---
 function donut(entries, size, thickness) {
@@ -574,12 +621,13 @@ function manualHtml() {
 // Контейнеры (история, карточка Russian Stocks) создаёт render() из /dash.js
 // ПОСЛЕ fetch /api/data — поэтому ждём их появления поллингом (раз в 300мс).
 function startDash2() {
-  var n = 0, histDone = false, manDone = false;
+  var n = 0, histDone = false, manDone = false, mcapDone = false;
   var iv = setInterval(function () {
     n++;
     if (!histDone && document.getElementById("histChart")) { histHtml(); histDone = true; }
+    if (!mcapDone && document.getElementById("mcapChart")) { mcapHtml(); mcapDone = true; }
     if (!manDone && document.querySelector("#cards .card")) { manualHtml(); manDone = true; }
-    if ((histDone && manDone) || n > 30) clearInterval(iv);
+    if ((histDone && manDone && mcapDone) || n > 30) clearInterval(iv);
   }, 300);
 }
 startDash2();
