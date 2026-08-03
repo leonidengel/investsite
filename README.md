@@ -49,7 +49,8 @@
 
 - Верхний блок дашборда — 3 подблока: **Markets** | **All wallets + donut** | **Portfolio history**.
 - **Markets**: ₿ BTC, Ξ ETH (в USD), ₮ USDT→₽, ₮ USDC→₽, $ USD→₽ / € EUR→₽ / £ GBP→₽
-  (официальные курсы ЦБ РФ), индекс страха и жадности.
+  (официальные курсы ЦБ РФ), 🌐 Total Mkt Cap (стоимость + спарклайн истории),
+  круговой индекс страха и жадности (как на Dropstab).
 - Источник курсов: **CoinGecko** (BTC/ETH в USD + USDT/USDC→RUB, без ключа) +
   **ЦБ РФ** (cbr-xml-daily.ru) для USD/EUR/GBP. BestChange API публично недоступен
   (таймаут/геоблок), пары USDT/RUB удалены на Binance/Bybit/OKX/KuCoin/MEXC/WhiteBIT.

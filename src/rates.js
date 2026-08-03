@@ -82,7 +82,7 @@ async function fetchPx() {
 
 // Общая капитализация крипторынка: CoinGecko /global, при неудаче — Coinpaprika
 // (CoinGecko может рейт-лимитить IP Cloudflare на этом эндпоинте)
-async function fetchMcap() {
+export async function fetchMcap() {
   const r = await fetchRetry("https://api.coingecko.com/api/v3/global");
   if (r) {
     try {
