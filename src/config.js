@@ -13,9 +13,9 @@ export const WALLETS = [
   {
     id: "wallet-b",
     name: "Tangem wallet",
-    address: "0x374db5dfa3ca89993ef0aa447dcde99e3e43577b",
+    address: "0x074AEB6A74Ba6623966a095F7349E187Ebb4AbEb",
     sources: [
-      { name: "DeBank", url: "https://debank.com/profile/0x374db5dfa3ca89993ef0aa447dcde99e3e43577b" },
+      { name: "DeBank", url: "https://debank.com/profile/0x074AEB6A74Ba6623966a095F7349E187Ebb4AbEb" },
     ],
   },
 ];

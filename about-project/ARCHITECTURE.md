@@ -176,7 +176,7 @@ fetch yields.llama.fi/pools (10.9 MB)
 | Кошелёк | Адрес / источник | Валюта карточки |
 |---|---|---|
 | **Rabby wallet** | `0x8d95…e2f1` (Zerion) | USD |
-| **Tangem wallet** | `0x374d…577b` (Zerion) | USD |
+| **Tangem wallet** | `0x074A…AbEb` (Zerion) | USD |
 | **Russian Stocks** | синтетический (MOEX), 20 паёв АКММ | **RUB** |
 
 Russian Stocks — **не блокчейн**, считается в `rfWalletSnapshot()`:

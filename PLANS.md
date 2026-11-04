@@ -4,7 +4,7 @@
 
 - **Дашборд портфеля**: https://portfolio.leonidengel.workers.dev
   - Zerion API (ключ в `credentials/zerion-key.txt`, секрет `ZERION_API_KEY`)
-  - 2 кошелька (`src/config.js` → WALLETS): A — 0x8d957c…, B — 0x374db5…
+  - 2 кошелька (`src/config.js` → WALLETS): A — 0x8d957c…, B — 0x074aeb…
   - **Общий donut по двум кошелькам сверху** (диаграммы у кошельков убраны по запросу),
     итог по обоим, активы, изменение за 24ч, кнопки DeBank/Krystal
   - **Рендер в браузере**: worker отдаёт статичную оболочку (`src/dashboard.js`),

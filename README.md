@@ -39,7 +39,7 @@
 ## Кошельки (src/config.js → WALLETS)
 
 - **Rabby wallet**: `0x8d95…` — источники: DeBank, Krystal
-- **Tangem wallet**: `0x374d…` — источник: DeBank
+- **Tangem wallet**: `0x074A…` — источник: DeBank
 - **Russian Stocks**: синтетический кошелёк — MOEX, 20 паёв фонда АКММ
   (Альфа Денежный рынок). Всё в РУБЛЯХ: `rfWalletSnapshot()` считает
   цена пая с INAV-доски × 20 (₽), для общего donut конвертирует через
