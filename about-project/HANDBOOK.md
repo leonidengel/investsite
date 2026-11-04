@@ -211,6 +211,7 @@ node scripts/sync-pools.mjs                                     # пулы (че
 ### Добавить ручной актив (золото/вклад) в Russian Stocks
 Через UI: карточка Russian Stocks → ➕ Add asset → символ/название/кол-во/цена ₽.
 Или через API: `POST /api/manual` с `{symbol,name,units,priceRub}`.
+Удаление — **✕** в строке актива (или `DELETE /api/manual?id=<id>`).
 Хранится в KV `manual`, считается в `rfWalletSnapshot()`.
 
 ### Изменить список токенов для пулов

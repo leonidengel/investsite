@@ -104,6 +104,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .abar-fill { background:#3b6ef5; height:100%; border-radius:3px; }
   .aval { width:74px; text-align:right; color:#1b2433; font-weight:600; }
   .apct { width:48px; text-align:right; color:#8b93a7; }
+  .del-asset { border:0; background:transparent; color:#c2c8d4; font-size:13px; line-height:1; cursor:pointer; padding:2px 4px; border-radius:6px; flex-shrink:0; }
+  .del-asset:hover { color:#dc2626; background:#fdecec; }
   .srcs { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
   .srcs.top { margin:2px 0 8px; justify-content:flex-end; }
   .src, .refresh { font-size:12px; color:#3b6ef5; text-decoration:none; border:1px solid #dbe3f7;
@@ -352,7 +354,8 @@ function walletCard(w, wi) {
     return '<div class="arow">' + icon +
       '<div class="aname"><b>' + esc(a.symbol) + "</b><span>" + esc(sub) + "</span></div>" +
       '<div class="abar"><div class="abar-fill" style="width:' + Math.max(pct, 0.4) + '%"></div></div>' +
-      '<div class="aval">' + fmt(a.value) + '</div><div class="apct">' + pct.toFixed(1) + "%</div></div>";
+      '<div class="aval">' + fmt(a.value) + '</div><div class="apct">' + pct.toFixed(1) + "%</div>" +
+      (a.manualId ? '<button class="del-asset" data-mid="' + esc(a.manualId) + '" title="Delete asset">✕</button>' : "") + "</div>";
   }).join("");
   return '<div class="card"><div class="head"><b>' + esc(w.name) + '</b> <span class="ok">' + (pf.total ? "OK" : "0") + "</span>" +
     '<span class="time">' + timeAgo(w.checkedAt) + "</span></div>" +
@@ -394,6 +397,17 @@ function render(snap) {
 }
 document.getElementById("refresh").addEventListener("click", function(){
   fetch("/api/refresh").then(function(){ location.reload(); });
+});
+// Удаление ручного актива (кнопка ✕ в строке актива)
+document.addEventListener("click", function (e) {
+  var b = e.target && e.target.closest ? e.target.closest(".del-asset") : null;
+  if (!b) return;
+  var id = b.getAttribute("data-mid");
+  if (!id || !confirm("Delete this asset?")) return;
+  fetch("/api/manual?id=" + encodeURIComponent(id), { method: "DELETE" })
+    .then(function () { return fetch("/api/refresh"); })
+    .then(function () { location.reload(); })
+    .catch(function () { location.reload(); });
 });
 Promise.all([
   fetch("/api/data").then(function(r){ return r.json(); }),
@@ -612,7 +626,7 @@ function manualHtml() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.ok) location.reload();
+      if (j.ok) fetch("/api/refresh").then(function () { location.reload(); });
       else document.getElementById("mfMsg").textContent = "error: " + (j.error || "?");
     });
   };
